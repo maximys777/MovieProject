@@ -24,7 +24,13 @@ public class TMDBController {
     }
 
     @GetMapping("/day-top")
-    public Flux<TrendMovieResponse> getCachedMovies() {
+    public Flux<TrendMovieResponse> getCachedMoviesForDay() {
+
         return tmdbService.getTrendingMoviesForOneDay();
+    }
+
+    @GetMapping("/week-top")
+    public Flux<TrendMovieResponse> getCachedMoviesForWeek() {
+        return tmdbService.getWeeklyTopMovies();
     }
 }
