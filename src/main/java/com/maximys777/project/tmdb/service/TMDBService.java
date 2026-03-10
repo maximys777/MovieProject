@@ -28,11 +28,26 @@ public class TMDBService {
     }
 
     @Scheduled(fixedRate = 86400000)
-    @Cacheable("movies")
+    @Cacheable(value = "moviesDayTop")
     public Flux<TrendMovieResponse> getTrendingMoviesForOneDay() {
-        System.out.println("get trending movie from API");
         return tmdbWebClient.get()
                 .uri("/day?page=1")
+                .retrieve()
+                .bodyToFlux(TrendMovieResponse.class)
+                .retryWhen(Retry.backoff(3, Duration.ofSeconds(2))
+                        .filter(this::isRetryableError)
+                        .doBeforeRetry(retrySignal ->
+                                System.out.println("Retry request. Attempt #" + (retrySignal.totalRetries() + 1))
+                        )
+                        .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) ->
+                                new RuntimeException("Service unavailable after" + retryBackoffSpec.maxAttempts + " attempts", retrySignal.failure())));
+    }
+
+    @Scheduled(fixedRate = 604800000)
+    @Cacheable(value = "moviesWeeklyTop")
+    public Flux<TrendMovieResponse> getWeeklyTopMovies() {
+        return tmdbWebClient.get()
+                .uri("/week?page=1")
                 .retrieve()
                 .bodyToFlux(TrendMovieResponse.class)
                 .retryWhen(Retry.backoff(3, Duration.ofSeconds(2))
