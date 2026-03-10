@@ -19,7 +19,12 @@ public class TMDBController {
 
     @GetMapping("/{timeWindow}")
     public Flux<TrendMovieResponse> getTrendingMovies(@PathVariable TimeWindow timeWindow,
-                                                      @RequestParam(defaultValue = "0") int page) {
+                                                      @RequestParam(defaultValue = "1") int page) {
         return tmdbService.getTrendingMovies(timeWindow, page);
+    }
+
+    @GetMapping("/day-top")
+    public Flux<TrendMovieResponse> getCachedMovies() {
+        return tmdbService.getTrendingMoviesForOneDay();
     }
 }
