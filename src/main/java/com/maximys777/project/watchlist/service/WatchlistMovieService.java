@@ -25,7 +25,7 @@ public class WatchlistMovieService {
     public AddedWatchlistMovieResponse addToWatchlistMovie(AddToWatchlistMovieRequest request, OidcUser oidcUser) {
         UserEntity user = handleUserNotFound(oidcUser.getEmail());
 
-        WatchlistMovieEntity watchlistMOvieEntity = WatchlistMovieEntity.builder()
+        WatchlistMovieEntity watchlistMovieEntity = WatchlistMovieEntity.builder()
                 .posterUrl(request.poster_path())
                 .title(request.title())
                 .movieId(request.movieId())
@@ -34,7 +34,7 @@ public class WatchlistMovieService {
                 .userId(user.getId())
                 .build();
 
-        WatchlistMovieEntity savedMovie = watchlistMovieRepository.save(watchlistMOvieEntity);
+        WatchlistMovieEntity savedMovie = watchlistMovieRepository.save(watchlistMovieEntity);
 
         return watchlistMovieMapper.mapToAddedWatchlistMovie(savedMovie);
     }
