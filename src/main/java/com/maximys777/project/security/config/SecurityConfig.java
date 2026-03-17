@@ -25,11 +25,11 @@ public class SecurityConfig {
                                 .oidcUserService(customOAuth2UserService))
                         .redirectionEndpoint(redirect -> redirect
                                 .baseUri("/grantcode"))
-                        .defaultSuccessUrl("/profile", true))
+                        .defaultSuccessUrl("/profile.html", true))
                 .formLogin(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/", "/error", "/grantcode").permitAll()
+                        .requestMatchers("/", "/error", "/grantcode", "/index.html", "/movies/**").permitAll()
                         .anyRequest().authenticated())
                 .build();
     }
