@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>КиноТренды</title>
+    <style>
+        :root {
+            --bg-color: #0b0b0d;
+            --card-bg: #16161a;
+            --text-color: #f1f1f1;
+            --text-muted: #8b8b99;
+            --primary-color: #e50914;
+            --card-border: rgba(255, 255, 255, 0.05);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        /* Навбар */
+        .navbar {
+            background-color: rgba(22, 22, 26, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--card-border);
+            padding: 0 50px;
+            height: 70px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .nav-links { display: flex; gap: 25px; align-items: center; }
+        .nav-links a { color: var(--text-color); text-decoration: none; font-weight: 500; font-size: 16px; line-height: 1; }
+        .navbar-logo { font-size: 22px; font-weight: 900; color: var(--primary-color); text-decoration: none; text-transform: uppercase; }
+        .navbar-logo span { color: var(--text-color); }
+
+        .profile-link {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            transition: 0.3s;
+            overflow: hidden;
+        }
+        .profile-link:hover { border-color: var(--primary-color); transform: scale(1.05); }
+        .avatar { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+
+        .content-wrapper { padding: 20px; max-width: 1400px; margin: 0 auto; }
+
+        /* ТРЕНДЫ */
+        .trending-section { position: relative; margin-bottom: 40px; }
+        .slider-container {
+            display: flex;
+            overflow-x: auto;
+            gap: 15px;
+            padding: 10px 0;
+            scroll-behavior: smooth;
+            scrollbar-width: none;
+        }
+        .slider-container::-webkit-scrollbar { display: none; }
+        .slider-item { flex: 0 0 140px; cursor: pointer; transition: 0.3s; min-width: 140px; }
+        .slider-item:hover { transform: translateY(-5px); }
+        .image-container {
+            position: relative;
+            width: 100%;
+            height: 210px;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 8px;
+            background: var(--card-bg);
+        }
+        .image-container img { width: 100%; height: 100%; object-fit: cover; }
+        .slider-item .movie-title { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .slider-nav {
+            position: absolute;
+            top: 135px;
+            width: 32px;
+            height: 32px;
+            background: var(--primary-color);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            z-index: 10;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+        }
+        .prev-slide { left: -16px; }
+        .next-slide { right: -16px; }
+
+        .lang-select {
+            background: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--card-border);
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            outline: none;
+        }
+
+        /* КАТАЛОГ */
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-left: 4px solid var(--primary-color); padding-left: 15px; }
+        h2 { font-size: 1.5rem; margin: 0; }
+        .controls button { background: var(--card-bg); color: var(--text-color); border: 1px solid var(--card-border); padding: 6px 15px; border-radius: 20px; cursor: pointer; }
+        .controls button.active { background: var(--primary-color); }
+
+        /* Улучшенная сетка для 20 фильмов: делаем карточки чуть крупнее */
+        #movies-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 25px;
+        }
+
+        .movie-card { background: var(--card-bg); border-radius: 10px; overflow: hidden; border: 1px solid var(--card-border); transition: 0.3s; position: relative; }
+        .movie-card:hover { border-color: var(--primary-color); transform: translateY(-3px); }
+        .movie-card img { width: 100%; height: 320px; object-fit: cover; }
+        .movie-card-body { padding: 12px; }
+        .movie-card-body .movie-title {
+            font-size: 14px; font-weight: bold; height: 40px; line-height: 20px; margin-bottom: 8px;
+            overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; text-overflow: ellipsis;
+        }
+
+        .rating-badge { position: absolute; top: 8px; right: 8px; background: rgba(0, 0, 0, 0.7); color: #ffd700; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+
+        /* Лоадер для бесконечного скролла */
+        .loading-status { text-align: center; padding: 20px; font-size: 14px; color: var(--text-muted); width: 100%; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <a href="#" class="navbar-logo">Кино<span>Тренды</span></a>
+    <div class="nav-links">
+        <a href="#" style="color: var(--primary-color); font-weight: bold; text-decoration: none;">Главная</a>
+        <select id="langSelect" class="lang-select" onchange="changeLanguage(this.value)">
+            <option value="en">EN</option>
+            <option value="ru" selected>RU</option>
+            <option value="uk">UK</option>
+        </select>
+        <a href="profile.html" class="profile-link">
+            <img src="https://ui-avatars.com/api/?name=User&background=e50914&color=fff" alt="Аватар" class="avatar">
+        </a>
+    </div>
+</nav>
+
+<div class="content-wrapper">
+    <div class="trending-section">
+        <div class="section-header">
+            <h2>Тренды</h2>
+            <div class="controls">
+                <button id="btn-day" onclick="updateTimeWindow('day', 'btn-day')" class="active">Сегодня</button>
+                <button id="btn-week" onclick="updateTimeWindow('week', 'btn-week')">За неделю</button>
+            </div>
+        </div>
+        <button id="prevBtn" class="slider-nav prev-slide" onclick="scrollSlider(-450)">&#10094;</button>
+        <div class="slider-container" id="trending-slider"></div>
+        <button id="nextBtn" class="slider-nav next-slide" onclick="scrollSlider(450)">&#10095;</button>
+    </div>
+
+    <div class="section-header">
+        <h2>Каталог фильмов</h2>
+    </div>
+
+    <div id="movies-grid"></div>
+    <div id="load-status" class="loading-status">Подождите, загрузка...</div>
+</div>
+
+<script>
+    const API_BASE_URL = 'http://localhost:8080';
+    const IMG_500 = 'https://image.tmdb.org/t/p/w500';
+
+    let currentLang = 'ru';
+    let currentTimeWindow = 'day';
+    let currentPage = 1;
+    let totalPages = 1;
+    let isLoading = false;
+
+    // Переключение дня/недели
+    function updateTimeWindow(window, btnId) {
+        currentTimeWindow = window;
+        document.querySelectorAll('.trending-section .controls button').forEach(b => b.classList.remove('active'));
+        document.getElementById(btnId).classList.add('active');
+
+        loadTrending();
+        resetCatalog();
+    }
+
+    // Смена языка
+    function changeLanguage(lang) {
+        currentLang = lang;
+        loadTrending();
+        resetCatalog();
+    }
+
+    // Очистка и запуск каталога заново
+    function resetCatalog() {
+        currentPage = 1;
+        document.getElementById('movies-grid').innerHTML = '';
+        loadCatalog();
+    }
+
+    // Скролл слайдера
+    function scrollSlider(dist) {
+        const slider = document.getElementById('trending-slider');
+        if (slider) slider.scrollBy({left: dist, behavior: 'smooth'});
+    }
+
+    function updateNavButtons() {
+        const slider = document.getElementById('trending-slider');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        if (!slider || !prevBtn || !nextBtn) return;
+        prevBtn.style.display = slider.scrollLeft > 10 ? 'flex' : 'none';
+        const isEnd = slider.scrollLeft + slider.clientWidth >= slider.scrollWidth - 15;
+        nextBtn.style.display = isEnd ? 'none' : 'flex';
+    }
+
+    // ТРЕНДЫ: Первые 10 фильмов
+    async function loadTrending() {
+        const slider = document.getElementById('trending-slider');
+        slider.innerHTML = '<p style="padding: 20px;">...</p>';
+        try {
+            const url = `${API_BASE_URL}/movies/${currentTimeWindow}?page=1&language=${currentLang}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            const responseData = Array.isArray(data) ? data[0] : data;
+            let movies = responseData.results.filter(m => m.poster_path).slice(0, 10);
+
+            slider.innerHTML = movies.map(movie => `
+                <div class="slider-item">
+                    <div class="image-container">
+                        <span class="rating-badge">★ ${movie.vote_average ? movie.vote_average.toFixed(1) : '0.0'}</span>
+                        <img src="${IMG_500}${movie.poster_path}" alt="${movie.title}" onerror="this.parentElement.parentElement.style.display='none'">
+                    </div>
+                    <div class="movie-title">${movie.title}</div>
+                </div>
+            `).join('');
+
+            setTimeout(updateNavButtons, 300);
+            slider.scrollLeft = 0;
+        } catch (e) { console.error(e); }
+    }
+
+    // КАТАЛОГ: Бесконечный скролл
+    async function loadCatalog() {
+        if (isLoading) return;
+        isLoading = true;
+        document.getElementById('load-status').innerText = 'Загрузка новых фильмов...';
+
+        try {
+            const url = `${API_BASE_URL}/movies/${currentTimeWindow}?page=${currentPage}&language=${currentLang}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            const responseData = Array.isArray(data) ? data[0] : data;
+
+            if (!responseData || !responseData.results) return;
+
+            totalPages = responseData.total_pages;
+            const movies = responseData.results.filter(m => m.poster_path);
+
+            appendMovies(movies);
+
+            if (currentPage >= totalPages) {
+                document.getElementById('load-status').innerText = 'Это все фильмы на сегодня';
+            } else {
+                document.getElementById('load-status').innerText = '';
+            }
+        } catch (e) {
+            console.error(e);
+            document.getElementById('load-status').innerText = 'Ошибка загрузки';
+        } finally {
+            isLoading = false;
+        }
+    }
+
+    function appendMovies(movies) {
+        const grid = document.getElementById('movies-grid');
+        const html = movies.map(movie => `
+            <div class="movie-card">
+                <div style="position:relative">
+                    <img src="${IMG_500}${movie.poster_path}" alt="${movie.title}" onerror="this.src='https://via.placeholder.com/500x750?text=No+Image'">
+                    <span class="rating-badge">★ ${movie.vote_average ? movie.vote_average.toFixed(1) : '0.0'}</span>
+                </div>
+                <div class="movie-card-body">
+                    <div class="movie-title" title="${movie.title}">${movie.title}</div>
+                    <button style="width:100%; padding:8px; background:var(--primary-color); border:none; color:white; border-radius:4px; cursor:pointer;"
+                            onclick="this.innerText='✅'; this.style.background='#28a745'">
+                        + Избранное
+                    </button>
+                </div>
+            </div>
+        `).join('');
+        grid.insertAdjacentHTML('beforeend', html);
+    }
+
+    // Слушатель скролла для подгрузки
+    window.addEventListener('scroll', () => {
+        if (isLoading || currentPage >= totalPages) return;
+
+        // Если до конца страницы осталось меньше 600px
+        if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 600) {
+            currentPage++;
+            loadCatalog();
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const slider = document.getElementById('trending-slider');
+        if (slider) slider.addEventListener('scroll', updateNavButtons);
+        currentLang = document.getElementById('langSelect').value;
+
+        loadTrending();
+        loadCatalog();
+    });
+</script>
+</body>
+</html>

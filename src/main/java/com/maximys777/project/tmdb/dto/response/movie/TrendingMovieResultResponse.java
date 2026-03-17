@@ -11,7 +11,6 @@ public record TrendingMovieResultResponse(
         Integer id,
         String title,
         String original_language,
-        String original_title,
         String overview,
         String poster_path,
         String media_type,

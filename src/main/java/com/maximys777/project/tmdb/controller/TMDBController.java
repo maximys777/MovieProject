@@ -1,5 +1,6 @@
 package com.maximys777.project.tmdb.controller;
 
+import com.maximys777.project.tmdb.common.LanguageType;
 import com.maximys777.project.tmdb.common.TimeWindow;
 import com.maximys777.project.tmdb.dto.response.movie.TrendMovieResponse;
 import com.maximys777.project.tmdb.service.TMDBService;
@@ -19,18 +20,8 @@ public class TMDBController {
 
     @GetMapping("/{timeWindow}")
     public Flux<TrendMovieResponse> getTrendingMovies(@PathVariable TimeWindow timeWindow,
-                                                      @RequestParam(defaultValue = "1") int page) {
-        return tmdbService.getTrendingMovies(timeWindow, page);
-    }
-
-    @GetMapping("/day-top")
-    public Flux<TrendMovieResponse> getCachedMoviesForDay() {
-
-        return tmdbService.getTrendingMoviesForOneDay();
-    }
-
-    @GetMapping("/week-top")
-    public Flux<TrendMovieResponse> getCachedMoviesForWeek() {
-        return tmdbService.getWeeklyTopMovies();
+                                                      @RequestParam(defaultValue = "1") int page,
+                                                      @RequestParam LanguageType language) {
+        return tmdbService.getTrendingMovies(timeWindow, page, language);
     }
 }
