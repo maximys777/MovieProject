@@ -18,7 +18,7 @@ public class CacheConfig {
     public CacheManager cacheManager() {
         CaffeineCacheManager cacheManager = new CaffeineCacheManager();
 
-
+        // Custom cache with custom time
         cacheManager.registerCustomCache("moviesDayTop", buildCache(50, 1, TimeUnit.DAYS));
         cacheManager.registerCustomCache("moviesWeeklyTop", buildCache(50, 7, TimeUnit.DAYS));
 

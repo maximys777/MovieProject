@@ -7,6 +7,7 @@ import java.util.List;
 @Builder
 public record TrendMovieResponse(
         int page,
-        List<TrendingMovieResultResponse> results
+        List<TrendingMovieResultResponse> results,
+        int total_pages
 ) {
 }

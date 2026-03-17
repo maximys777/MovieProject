@@ -1,0 +1,42 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-watchlistmovie-table
+      author: maximys777
+      changes:
+        - createTable:
+            tableName: watchlist_movies
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: poster_url
+                  type: VARCHAR(255)
+              - column:
+                  name: title
+                  type: VARCHAR(255)
+              - column:
+                  name: movie_id
+                  type: BIGINT
+              - column:
+                  name: release_date
+                  type: TIMESTAMP
+              - column:
+                  name: added_date
+                  type: TIMESTAMP
+              - column:
+                  name: popularity
+                  type: java.math.BigDecimal
+              - column:
+                  name: user_id
+                  type: BIGINT
+
+        - addForeignKeyConstraint:
+            baseTableName: watchlist_movies
+            baseColumnNames: user_id
+            referencedTableName: users
+            referencedColumnNames: id
+            constraintName: fk_watchlistmovie_user
