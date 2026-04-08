@@ -233,4 +233,72 @@ public class WatchlistMovieServiceTest {
 
         Mockito.verify(userRepository, Mockito.times(1)).findByEmail(Mockito.anyString());
     }
+
+    @Test
+    void deleteMovieFromWatchlist_ShouldDeleteMovie_WhenSuccess() {
+        String email = "test@gmail.com";
+        OidcUser oidcUser = Mockito.mock(OidcUser.class);
+
+        Mockito.when(oidcUser.getEmail()).thenReturn(email);
+
+        UserEntity user = UserEntity.builder()
+                .id(1L)
+                .email(email)
+                .build();
+
+        WatchlistMovieEntity watchlistMovieEntity = WatchlistMovieEntity.builder()
+                .id(10L)
+                .movieId(1L)
+                .userId(user.getId())
+                .build();
+
+        Mockito.when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+        Mockito.when(watchlistMovieRepository.existsByMovieIdAndUserId(watchlistMovieEntity.getId(), user.getId())).thenReturn(true);
+
+        watchlistMovieService.deleteMovieFromWatchlist(oidcUser, watchlistMovieEntity.getId());
+
+        Mockito.verify(userRepository, Mockito.times(1)).findByEmail(email);
+        Mockito.verify(watchlistMovieRepository, Mockito.times(1)).existsByMovieIdAndUserId(watchlistMovieEntity.getId(), user.getId());
+        Mockito.verify(watchlistMovieRepository, Mockito.times(1)).deleteByUserIdAndMovieId(user.getId(), watchlistMovieEntity.getId());
+    }
+
+    @Test
+    void deleteMovieFromWatchlist_ShouldThrowUserNotFoundException_WhenUserNotFound() {
+        Long movieId = 90005L;
+        OidcUser oidcUser = Mockito.mock(OidcUser.class);
+        Mockito.when(oidcUser.getEmail()).thenReturn("test@test.com");
+
+        Mockito.when(userRepository.findByEmail(Mockito.anyString())).thenReturn(Optional.empty());
+
+        Assertions.assertThrows(UsernameNotFoundException.class, () ->
+                watchlistMovieService.deleteMovieFromWatchlist(oidcUser, movieId));
+
+        Mockito.verify(watchlistMovieRepository, Mockito.never()).existsByMovieIdAndUserId(Mockito.anyLong(), Mockito.anyLong());
+        Mockito.verify(watchlistMovieRepository, Mockito.never()).deleteByUserIdAndMovieId(Mockito.anyLong(), Mockito.anyLong());
+    }
+
+    @Test
+    void deleteMovieFromWatchlist_ShouldThrowMovieNotFoundException_WhenMovieNotFound() {
+        String email = "test@gmail.com";
+        Long movieId = 90005L;
+        OidcUser oidcUser = Mockito.mock(OidcUser.class);
+
+        Mockito.when(oidcUser.getEmail()).thenReturn(email);
+
+        UserEntity user = UserEntity.builder()
+                .id(1L)
+                .email(email)
+                .build();
+
+        Mockito.when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+        Mockito.when(watchlistMovieRepository.existsByMovieIdAndUserId(movieId, user.getId())).thenReturn(false);
+
+        IllegalArgumentException exception = Assertions.assertThrows(IllegalArgumentException.class, () ->
+                watchlistMovieService.deleteMovieFromWatchlist(oidcUser, movieId));
+
+        Assertions.assertEquals("Movie not found in your watchlist", exception.getMessage());
+
+        Mockito.verify(watchlistMovieRepository, Mockito.times(1)).existsByMovieIdAndUserId(movieId, user.getId());
+        Mockito.verify(watchlistMovieRepository, Mockito.never()).deleteByUserIdAndMovieId(Mockito.anyLong(), Mockito.anyLong());
+    }
 }
