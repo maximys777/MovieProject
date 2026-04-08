@@ -32,7 +32,6 @@ public class TMDBService {
                         )
                         .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) ->
                                 new RuntimeException("Service unavailable after" + retryBackoffSpec.maxAttempts + " attempts", retrySignal.failure())));
-
     }
 
     private boolean isRetryableError(Throwable throwable) {

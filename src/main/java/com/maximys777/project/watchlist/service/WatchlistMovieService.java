@@ -57,6 +57,16 @@ public class WatchlistMovieService {
         return dtoPage.map(watchlistMovieMapper::mapToWatchlistMovie);
     }
 
+    public void deleteMovieFromWatchlist(OidcUser oidcUser, Long movieId) {
+        UserEntity user = handleUserNotFound(oidcUser.getEmail());
+
+        if (!watchlistMovieRepository.existsByMovieIdAndUserId(movieId, user.getId())) {
+            throw new IllegalArgumentException("Movie not found in your watchlist");
+        }
+
+        watchlistMovieRepository.deleteByUserIdAndMovieId(user.getId(), movieId);
+    }
+
     //TODO create custom exception
     private UserEntity handleUserNotFound(String userEmail) {
         return userRepository.findByEmail(userEmail)
