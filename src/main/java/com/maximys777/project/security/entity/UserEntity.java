@@ -1,6 +1,6 @@
 package com.maximys777.project.security.entity;
 
-import com.maximys777.project.watchlist.entity.WatchlistMovieEntity;
+import com.maximys777.project.watchlist.movie.entity.WatchlistMovieEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

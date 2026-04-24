@@ -1,6 +1,6 @@
-package com.maximys777.project.watchlist.repository;
+package com.maximys777.project.watchlist.movie.repository;
 
-import com.maximys777.project.watchlist.entity.WatchlistMovieEntity;
+import com.maximys777.project.watchlist.movie.entity.WatchlistMovieEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

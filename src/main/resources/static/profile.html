@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мій Профіль - КиноТренды</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/profile.css">
+</head>
+<body>
+
+<nav class="navbar">
+    <a href="/" class="navbar-logo">Кино<span>Тренды</span></a>
+    <div class="nav-links">
+        <a href="index.html">Головна</a>
+        <select id="langSelect" class="lang-select" onchange="changeLanguage(this.value)">
+            <option value="en">EN</option>
+            <option value="ru" selected>RU</option>
+            <option value="uk">UK</option>
+        </select>
+        <a href="profile.html" class="profile-link" style="border-color: var(--primary-color);">
+            <img src="https://ui-avatars.com/api/?name=User&background=e50914&color=fff" alt="Аватар" class="avatar">
+        </a>
+    </div>
+</nav>
+
+<div class="content-wrapper">
+    <div class="profile-header">
+        <img src="https://ui-avatars.com/api/?name=User&background=e50914&color=fff" alt="Аватар" class="profile-avatar">
+        <div class="profile-info">
+            <h1 id="profile-name">Мій Профіль</h1>
+            <p>Особиста колекція фільмів та серіалів</p>
+            <div class="profile-stats">
+                <div class="stat-item"><div class="stat-value" id="total-movies">0</div><div class="stat-label">Фільмів</div></div>
+                <div class="stat-item"><div class="stat-value" id="total-tv">0</div><div class="stat-label">Серіалів</div></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="slider-section">
+        <div class="section-header">
+            <h2>Збережені фільми</h2>
+            <button class="btn-view-all" onclick="openFullGrid('movies')">Дивитися всі</button>
+        </div>
+        <div class="slider-wrapper">
+            <button class="slider-nav prev-slide" onclick="scrollSlider('movies-slider', -450)">&#10094;</button>
+            <div class="slider-container" id="movies-slider"></div>
+            <button class="slider-nav next-slide" onclick="scrollSlider('movies-slider', 450)">&#10095;</button>
+        </div>
+    </div>
+
+    <div class="slider-section" style="margin-top: 50px;">
+        <div class="section-header">
+            <h2>Збережені серіали</h2>
+            <button class="btn-view-all" onclick="openFullGrid('tv-shows')">Дивитися всі</button>
+        </div>
+        <div class="slider-wrapper">
+            <button class="slider-nav prev-slide" onclick="scrollSlider('tv-shows-slider', -450)">&#10094;</button>
+            <div class="slider-container" id="tv-shows-slider"></div>
+            <button class="slider-nav next-slide" onclick="scrollSlider('tv-shows-slider', 450)">&#10095;</button>
+        </div>
+    </div>
+</div>
+
+<div id="movie-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 650px;">
+        <div class="modal-body">
+
+            <div class="modal-header-info">
+                <div style="position: relative; flex-shrink: 0;">
+                    <img id="movie-modal-poster" src="" alt="Постер">
+                    <div id="movie-modal-rating" class="modal-rating-badge">★ 0.0</div>
+                </div>
+                <div class="modal-details">
+                    <h2 id="movie-modal-title">Название фильма</h2>
+                    <div class="modal-tags">
+                        <span id="movie-modal-year">...</span>
+                        <span id="movie-modal-country">...</span>
+                        <span id="movie-modal-runtime">...</span>
+                    </div>
+                    <div id="movie-modal-genres" class="modal-genres"></div>
+                </div>
+            </div>
+
+            <div class="modal-movie-overview" style="border-top: 1px solid var(--card-border); padding-top: 20px;">
+                <h3 style="margin-bottom: 10px; font-size: 18px; color: white;">Про фільм</h3>
+                <div class="overview-wrapper" style="margin-top: 0;">
+                    <p id="movie-modal-overview" class="modal-overview-text collapsed" style="font-size: 15px;">Опис...</p>
+                    <button id="movie-read-more" class="btn-read-more" onclick="toggleOverview('movie-modal-overview', this)">Читати далі</button>
+                </div>
+            </div>
+
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" onclick="closeModal('movie-modal')">Закрити</button>
+            <button id="btn-delete-movie" class="btn-delete-action">Видалити зі списку</button>
+        </div>
+    </div>
+</div>
+
+<div id="progress-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 750px;">
+        <div class="modal-body">
+            <div class="modal-header-info">
+                <div style="position: relative; flex-shrink: 0;">
+                    <img id="modal-poster" src="" alt="Постер">
+                    <div id="modal-rating" class="modal-rating-badge">★ 0.0</div>
+                </div>
+                <div class="modal-details">
+                    <h2 id="modal-title">Название сериала</h2>
+                    <div class="modal-tags">
+                        <span id="modal-year">...</span>
+                        <span id="modal-country">...</span>
+                    </div>
+                    <div id="modal-genres" class="modal-genres"></div>
+
+                    <p class="modal-description" style="color: var(--primary-color); font-weight: bold; margin-top: 10px;">Твій прогресс: <span id="modal-status-text">...</span></p>
+
+                    <div class="overview-wrapper">
+                        <p id="modal-overview" class="modal-overview-text collapsed">Опис...</p>
+                        <button id="tv-read-more" class="btn-read-more" onclick="toggleOverview('modal-overview', this)">Читати далі</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-progress-section">
+                <div class="progress-header"><h3>Історія перегляду</h3></div>
+                <div id="season-tabs" class="season-tabs"></div>
+                <h4 id="episodes-title" style="margin-top: 20px; margin-bottom: 15px; font-size: 16px;">Епізоди сезону</h4>
+                <div id="episodes-grid" class="episodes-grid"></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" onclick="closeModal('progress-modal')">Закрити</button>
+            <button id="btn-delete-tv" class="btn-delete-action">Видалити зі списку</button>
+        </div>
+    </div>
+</div>
+
+
+<div id="full-grid-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 1100px; height: 85vh;">
+        <div class="modal-body" id="grid-scroll-container">
+            <h2 id="full-grid-title" style="margin-bottom: 20px;">Всі збережені</h2>
+            <div id="full-grid-content" class="movies-grid"></div>
+            <div id="grid-load-status" class="loading-status" style="margin-top: 20px;"></div>
+        </div>
+        <div class="modal-footer" style="justify-content: center;">
+            <button class="btn-cancel" onclick="closeModal('full-grid-modal')">Закрити картотеку</button>
+        </div>
+    </div>
+</div>
+
+<div id="custom-toast" class="toast-notification">Успішно!</div>
+<script src="/js/profile.js"></script>
+</body>
+</html>

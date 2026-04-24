@@ -1,19 +1,19 @@
-package com.maximys777.project.tmdb.dto.response.movie;
+package com.maximys777.project.watchlist.movie.dto.request;
 
 import lombok.Builder;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.annotation.JsonNaming;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
 @Builder
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public record TrendingMovieResultResponse(
-        Long id,
-        String overview,
+public record AddToWatchlistMovieRequest(
         String posterPath,
-        String releaseDate,
         String title,
-        Double voteAverage,
-        Long voteCount,
-        Double popularity
+        Long movieId,
+        LocalDateTime releaseDate,
+        BigDecimal popularity
 ) {
 }
