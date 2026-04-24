@@ -20,6 +20,8 @@ public class CacheConfig {
 
         // Custom cache with custom time
         cacheManager.registerCustomCache("movies", buildCache(100, 6, TimeUnit.HOURS));
+        cacheManager.registerCustomCache("tvShows", buildCache(100, 6, TimeUnit.HOURS));
+        cacheManager.registerCustomCache("tvShowDetails", buildCache(1000, 3, TimeUnit.HOURS));
 
         cacheManager.setAsyncCacheMode(true);
         return cacheManager;

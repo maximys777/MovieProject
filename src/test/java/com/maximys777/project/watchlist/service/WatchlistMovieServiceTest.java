@@ -2,12 +2,14 @@ package com.maximys777.project.watchlist.service;
 
 import com.maximys777.project.security.entity.UserEntity;
 import com.maximys777.project.security.repository.UserRepository;
-import com.maximys777.project.watchlist.dto.request.AddToWatchlistMovieRequest;
-import com.maximys777.project.watchlist.dto.response.AddedWatchlistMovieResponse;
-import com.maximys777.project.watchlist.dto.response.WatchlistMovieResponse;
-import com.maximys777.project.watchlist.entity.WatchlistMovieEntity;
-import com.maximys777.project.watchlist.mapper.WatchlistMovieMapper;
-import com.maximys777.project.watchlist.repository.WatchlistMovieRepository;
+import com.maximys777.project.tmdb.common.LanguageType;
+import com.maximys777.project.watchlist.movie.dto.request.AddToWatchlistMovieRequest;
+import com.maximys777.project.watchlist.movie.dto.response.AddedWatchlistMovieResponse;
+import com.maximys777.project.watchlist.movie.dto.response.WatchlistMovieResponse;
+import com.maximys777.project.watchlist.movie.entity.WatchlistMovieEntity;
+import com.maximys777.project.watchlist.movie.mapper.WatchlistMovieMapper;
+import com.maximys777.project.watchlist.movie.repository.WatchlistMovieRepository;
+import com.maximys777.project.watchlist.movie.service.WatchlistMovieService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -66,10 +68,10 @@ public class WatchlistMovieServiceTest {
 
         WatchlistMovieEntity watchlistMovieEntity = WatchlistMovieEntity.builder()
                 .id(10L)
-                .posterUrl(request.poster_path())
+                .posterUrl(request.posterPath())
                 .title(request.title())
                 .movieId(request.movieId())
-                .releaseDate(request.release_date())
+                .releaseDate(request.releaseDate())
                 .popularity(request.popularity())
                 .build();
 
@@ -130,16 +132,24 @@ public class WatchlistMovieServiceTest {
         Page<WatchlistMovieEntity> entityPage = new PageImpl<>(List.of(entity));
 
         LocalDateTime dateTime = LocalDateTime.of(2024, 3, 17, 10, 30, 0);
-        BigDecimal popularity = BigDecimal.valueOf(137.5);
+        Double voteAverage = 8.9;
+
+        List<String> genres = List.of("fantasy", "sports");
+        List<String> productionCountries = List.of("United Kingdom");
 
         WatchlistMovieResponse expectedResponse = new WatchlistMovieResponse(
                 10L,
                 "path/to/poster",
                 "Movie title",
+                "Description about film",
+                90,
                 90005L,
                 dateTime,
-                popularity,
-                user.getId());
+                voteAverage,
+                user.getId(),
+                genres,
+                productionCountries);
+
 
         Mockito.when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
         Mockito.when(watchlistMovieRepository.getWatchlistMovieEntityByUserId(user.getId(), pageable))
@@ -147,7 +157,7 @@ public class WatchlistMovieServiceTest {
         Mockito.when(watchlistMovieMapper.mapToWatchlistMovie(entity)).thenReturn(expectedResponse);
 
         Page<WatchlistMovieResponse> actualResponse = watchlistMovieService
-                .findUsersWatchlistMovie(user.getId(), pageable);
+                .findUsersWatchlistMovie(user.getId(), pageable, LanguageType.en);
 
         Assertions.assertNotNull(actualResponse);
         Assertions.assertEquals(1, actualResponse.getTotalElements());
@@ -166,7 +176,7 @@ public class WatchlistMovieServiceTest {
         Mockito.when(userRepository.findById(1L)).thenReturn(Optional.empty());
 
         Assertions.assertThrows(UsernameNotFoundException.class, () ->
-                watchlistMovieService.findUsersWatchlistMovie(1L, pageable));
+                watchlistMovieService.findUsersWatchlistMovie(1L, pageable, LanguageType.en));
 
         Mockito.verify(userRepository, Mockito.times(1)).findById(1L);
     }
@@ -192,23 +202,31 @@ public class WatchlistMovieServiceTest {
         Page<WatchlistMovieEntity> entityPage = new PageImpl<>(List.of(entity));
 
         LocalDateTime dateTime = LocalDateTime.of(2024, 3, 17, 10, 30, 0);
-        BigDecimal popularity = BigDecimal.valueOf(137.5);
+        Double voteAverage = 8.9;
+
+        List<String> genres = List.of("fantasy", "sports");
+        List<String> productionCountries = List.of("United Kingdom");
 
         WatchlistMovieResponse expectedResponse = new WatchlistMovieResponse(
                 10L,
                 "path/to/poster",
                 "Movie title",
+                "Description about film",
+                90,
                 90005L,
                 dateTime,
-                popularity,
-                user.getId());
+                voteAverage,
+                user.getId(),
+                genres,
+                productionCountries);
 
         Mockito.when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
         Mockito.when(watchlistMovieRepository.getWatchlistMovieEntityByUserId(user.getId(), pageable))
                 .thenReturn(entityPage);
         Mockito.when(watchlistMovieMapper.mapToWatchlistMovie(entity)).thenReturn(expectedResponse);
 
-        Page<WatchlistMovieResponse> actualResponse = watchlistMovieService.getAuthenticatedUserWatchlist(oidcUser, pageable);
+        Page<WatchlistMovieResponse> actualResponse =
+                watchlistMovieService.getAuthenticatedUserWatchlist(oidcUser, pageable, LanguageType.en);
 
         Assertions.assertNotNull(actualResponse);
         Assertions.assertEquals(1, actualResponse.getTotalElements());
@@ -229,7 +247,7 @@ public class WatchlistMovieServiceTest {
         Mockito.when(userRepository.findByEmail(Mockito.anyString())).thenReturn(Optional.empty());
 
         Assertions.assertThrows(UsernameNotFoundException.class, () ->
-                watchlistMovieService.getAuthenticatedUserWatchlist(oidcUser, pageable));
+                watchlistMovieService.getAuthenticatedUserWatchlist(oidcUser, pageable, LanguageType.en));
 
         Mockito.verify(userRepository, Mockito.times(1)).findByEmail(Mockito.anyString());
     }

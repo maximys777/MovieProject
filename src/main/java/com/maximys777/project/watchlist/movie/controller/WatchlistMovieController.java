@@ -1,9 +1,10 @@
-package com.maximys777.project.watchlist.controller;
+package com.maximys777.project.watchlist.movie.controller;
 
-import com.maximys777.project.watchlist.dto.request.AddToWatchlistMovieRequest;
-import com.maximys777.project.watchlist.dto.response.AddedWatchlistMovieResponse;
-import com.maximys777.project.watchlist.dto.response.WatchlistMovieResponse;
-import com.maximys777.project.watchlist.service.WatchlistMovieService;
+import com.maximys777.project.tmdb.common.LanguageType;
+import com.maximys777.project.watchlist.movie.dto.request.AddToWatchlistMovieRequest;
+import com.maximys777.project.watchlist.movie.dto.response.AddedWatchlistMovieResponse;
+import com.maximys777.project.watchlist.movie.dto.response.WatchlistMovieResponse;
+import com.maximys777.project.watchlist.movie.service.WatchlistMovieService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -35,14 +36,16 @@ public class WatchlistMovieController {
 
     @GetMapping("/{userId}/user")
     public Page<WatchlistMovieResponse> getWatchlistMovie(@PathVariable Long userId,
-                                                          Pageable pageable) {
-        return watchlistMovieService.findUsersWatchlistMovie(userId, pageable);
+                                                          Pageable pageable,
+                                                          @RequestParam LanguageType language) {
+        return watchlistMovieService.findUsersWatchlistMovie(userId, pageable, language);
     }
 
     @GetMapping("/me")
     public Page<WatchlistMovieResponse> getMyWatchlistMovie(@AuthenticationPrincipal OidcUser oidcUser,
-                                                            Pageable pageable) {
-        return watchlistMovieService.getAuthenticatedUserWatchlist(oidcUser, pageable);
+                                                            Pageable pageable,
+                                                            @RequestParam LanguageType language) {
+        return watchlistMovieService.getAuthenticatedUserWatchlist(oidcUser, pageable, language);
     }
 
     @DeleteMapping

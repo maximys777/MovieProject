@@ -1,4 +1,4 @@
-package com.maximys777.project.watchlist.entity;
+package com.maximys777.project.watchlist.movie.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.maximys777.project.security.entity.UserEntity;
