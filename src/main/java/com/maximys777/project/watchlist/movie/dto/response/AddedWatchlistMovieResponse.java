@@ -1,4 +1,4 @@
-package com.maximys777.project.watchlist.dto.response;
+package com.maximys777.project.watchlist.movie.dto.response;
 
 import lombok.Builder;
 

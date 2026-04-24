@@ -1,16 +1,14 @@
-package com.maximys777.project.tmdb.dto.response.movie;
+package com.maximys777.project.tmdb.dto.response.tvshow;
 
-import lombok.Builder;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.annotation.JsonNaming;
 
 import java.util.List;
 
-@Builder
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public record TrendMovieResponse(
+public record TrendTvShowResponse(
         int page,
-        List<TrendingMovieResultResponse> results,
+        List<TvShowResultResponse> results,
         int totalPages
 ) {
 }

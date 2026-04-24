@@ -1,0 +1,41 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-watchlisttvshow-table
+      author: maximys777
+      changes:
+        - createTable:
+            tableName: watchlist_tv_shows
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: tv_show_id
+                  type: BIGINT
+              - column:
+                  name: name
+                  type: VARCHAR(255)
+              - column:
+                  name: poster_url
+                  type: VARCHAR(255)
+              - column:
+                  name: first_air_date
+                  type: VARCHAR(255)
+              - column:
+                  name: origin_country
+                  type: VARCHAR(255)
+              - column:
+                  name: current_season
+                  type: INT
+              - column:
+                  name: current_episode
+                  type: INT
+              - column:
+                  name: added_date
+                  type: TIMESTAMP
+              - column:
+                  name: user_id
+                  type: BIGINT

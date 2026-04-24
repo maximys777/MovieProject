@@ -15,7 +15,7 @@ public class TMDBConfiguration {
     @Bean
     public WebClient tmdbWebClient() {
         return WebClient.builder()
-                .baseUrl("https://api.themoviedb.org/3/trending/movie")
+                .baseUrl("https://api.themoviedb.org/3")
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .build();
     }
