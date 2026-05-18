@@ -5,6 +5,9 @@ import com.maximys777.project.tmdb.common.TimeWindow;
 import com.maximys777.project.tmdb.dto.response.movie.MovieDetails;
 import com.maximys777.project.tmdb.dto.response.movie.TrendMovieResponse;
 import com.maximys777.project.tmdb.dto.response.movie.TrendingMovieResultResponse;
+import com.maximys777.project.tmdb.dto.response.search.GenreListResponse;
+import com.maximys777.project.tmdb.dto.response.search.MultiSearchDetailsResponse;
+import com.maximys777.project.tmdb.dto.response.search.MultiSearchResponse;
 import com.maximys777.project.tmdb.dto.response.tvshow.TrendTvShowResponse;
 import com.maximys777.project.tmdb.dto.response.tvshow.TvShowResultResponse;
 import com.maximys777.project.watchlist.tvshow.dto.response.seasons.SeasonResponse;
@@ -84,7 +87,6 @@ public class TMDBService {
 
                     return new TvShowDetailsResponse(
                             response.id(),
-                            response.tvShowId(),
                             response.name(),
                             response.overview(),
                             response.voteAverage(),
@@ -112,6 +114,39 @@ public class TMDBService {
                 .bodyToMono(MovieDetails.class)
                 .retryWhen(Retry.backoff(3, Duration.ofSeconds(2))
                         .filter(this::isRetryableError));
+    }
+
+    public Mono<GenreListResponse> getMovieGenres(LanguageType language) {
+        return tmdbWebClient.get()
+                .uri("/genre/movie/list?language={language}", language)
+                .retrieve()
+                .bodyToMono(GenreListResponse.class)
+                .retryWhen(Retry.backoff(3, Duration.ofSeconds(2))
+                        .filter(this::isRetryableError));
+    }
+
+    public Mono<GenreListResponse> getTvGenres(LanguageType language) {
+        return tmdbWebClient.get()
+                .uri("/genre/tv/list?language={language}", language)
+                .retrieve()
+                .bodyToMono(GenreListResponse.class)
+                .retryWhen(Retry.backoff(3, Duration.ofSeconds(2))
+                        .filter(this::isRetryableError));
+    }
+
+    public Mono<MultiSearchResponse> multiSearch(String query, LanguageType language, int page) {
+        return tmdbWebClient.get()
+                .uri("/search/multi?query={query}&language={language}&page={page}", query, language, page)
+                .retrieve()
+                .bodyToMono(MultiSearchResponse.class)
+                .map(response -> {
+                    List<MultiSearchDetailsResponse> filteredResponse = response.results().stream()
+                            .filter(item -> item.voteAverage() != null && item.voteAverage() > 0.0 ||
+                                    item.posterPath() != null && !item.posterPath().isEmpty())
+                            .toList();
+
+                    return new MultiSearchResponse(page, filteredResponse, response.totalPages(), response.totalResults());
+                });
     }
 
     private boolean isRetryableError(Throwable throwable) {

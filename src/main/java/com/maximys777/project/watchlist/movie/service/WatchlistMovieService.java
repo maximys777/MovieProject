@@ -120,6 +120,15 @@ public class WatchlistMovieService {
         watchlistMovieRepository.deleteByUserIdAndMovieId(user.getId(), movieId);
     }
 
+    public Page<WatchlistMovieResponse> findMovieInUsersWatchlist(OidcUser oidcUser, String movieName, LanguageType language, Pageable pageable) {
+        UserEntity user = handleUserNotFound(oidcUser.getEmail());
+
+        Page<WatchlistMovieEntity> entityPage = watchlistMovieRepository.
+                findByUserIdAndTitleContainingIgnoreCase(user.getId(), movieName, pageable);
+
+        return entityPage.map(entity -> watchlistMovieMapper.mapToPageableWatchlistMovie(entity, language));
+    }
+
     //TODO create custom exception
     private UserEntity handleUserNotFound(String userEmail) {
         return userRepository.findByEmail(userEmail)

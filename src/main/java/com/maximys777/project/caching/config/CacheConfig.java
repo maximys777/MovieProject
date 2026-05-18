@@ -22,6 +22,7 @@ public class CacheConfig {
         cacheManager.registerCustomCache("movies", buildCache(100, 6, TimeUnit.HOURS));
         cacheManager.registerCustomCache("tvShows", buildCache(100, 6, TimeUnit.HOURS));
         cacheManager.registerCustomCache("tvShowDetails", buildCache(1000, 3, TimeUnit.HOURS));
+        cacheManager.registerCustomCache("tvShowDetails", buildCache(100, 3, TimeUnit.DAYS));
 
         cacheManager.setAsyncCacheMode(true);
         return cacheManager;

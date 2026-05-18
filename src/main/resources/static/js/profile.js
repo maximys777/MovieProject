@@ -1,53 +1,88 @@
-const API_BASE_URL = '';
-const IMG_500 = 'https://image.tmdb.org/t/p/w500';
-
-let currentLang = 'ru';
+// ВАЖНО: Константы API_BASE_URL и IMG_500 берутся из main.js
 let loadedMovies = {};
 let loadedTvShows = {};
 let activeModalData = null;
 
-// ФЛАГ БЕЗОПАСНОСТИ: В будущем, если смотришь чужой профиль - ставь false
 let isMyProfile = true;
+let currentProfileUserId = null;
 
-// Пагинация для модалки "Всі збережені"
+// ПЕРЕМЕННЫЕ ДЛЯ ПОИСКА ПО КАРТОТЕКЕ
+let currentGridQuery = '';
+let gridSearchTimeout = null;
+
 let gridType = '';
 let gridPage = 0;
 let gridTotalPages = 1;
 let isGridLoading = false;
 
 document.addEventListener('DOMContentLoaded', () => {
-    const langSelect = document.getElementById('langSelect');
-    if (langSelect) currentLang = langSelect.value;
+    // 1. ПРОВЕРЯЕМ URL: Мы у себя или в гостях?
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlUserId = urlParams.get('userId');
+    const gridSearchInput = document.getElementById('grid-search-input');
+
+    if (urlUserId) {
+        // РЕЖИМ ГОСТЯ
+        isMyProfile = false;
+        currentProfileUserId = urlUserId;
+        document.getElementById('profile-name').innerText = 'Профіль користувача';
+        document.querySelectorAll('.btn-delete-action').forEach(btn => btn.style.display = 'none');
+
+        // Скрываем поиск в чужом профиле, так как бэкенд ищет только по OidcUser (владельцу сессии)
+        if (gridSearchInput) gridSearchInput.style.display = 'none';
+    } else {
+        // РЕЖИМ ХОЗЯИНА
+        isMyProfile = true;
+        if (gridSearchInput) gridSearchInput.style.display = 'block';
+    }
+
+    // 2. СЛУШАТЕЛЬ ДЛЯ ЖИВОГО ПОИСКА В КАРТОТЕКЕ
+    if (gridSearchInput) {
+        gridSearchInput.addEventListener('input', (e) => {
+            currentGridQuery = e.target.value.trim();
+            clearTimeout(gridSearchTimeout);
+
+            // Ждем 500мс после ввода, чтобы не ДДОСить бэкенд
+            gridSearchTimeout = setTimeout(() => {
+                gridPage = 0;
+                document.getElementById('full-grid-content').innerHTML = '';
+                loadGridPage();
+            }, 500);
+        });
+    }
+
+    // Сразу грузим дашборд
     loadDashboard();
 });
 
+// Переопределяем функцию смены языка специально для профиля
 function changeLanguage(lang) {
     currentLang = lang;
+    localStorage.setItem('app_language', lang);
+    if (typeof applyTranslations === 'function') applyTranslations();
     loadDashboard();
 }
 
-function showToast(message, isError = false) {
-    const toast = document.getElementById('custom-toast');
-    toast.innerText = message;
-    toast.className = 'toast-notification show';
-    if (isError) toast.classList.add('error');
-    setTimeout(() => toast.classList.remove('show'), 3000);
-}
-
-function scrollSlider(id, amount) {
-    document.getElementById(id).scrollBy({left: amount, behavior: 'smooth'});
-}
-
 function closeModal(modalId) {
-    document.getElementById(modalId).classList.remove('show');
+    const el = document.getElementById(modalId);
+    if (el) el.classList.remove('show');
+    if (typeof checkBodyScroll === 'function') checkBodyScroll();
 }
 
 // =======================
 // 1. ЗАГРУЗКА ДАШБОРДА (КАРУСЕЛИ)
 // =======================
 async function loadDashboard() {
-    fetchAndRender(`${API_BASE_URL}/watchlist-movies/me?page=0&size=20&language=${currentLang}`, 'movies-slider', true);
-    fetchAndRender(`${API_BASE_URL}/watchlist-tv-shows/me?page=0&size=20&language=${currentLang}`, 'tv-shows-slider', false);
+    const movieUrl = isMyProfile
+        ? `${API_BASE_URL}/watchlist-movies/me?page=0&size=20&language=${currentLang}`
+        : `${API_BASE_URL}/watchlist-movies/${currentProfileUserId}/user?page=0&size=20&language=${currentLang}`;
+
+    const tvUrl = isMyProfile
+        ? `${API_BASE_URL}/watchlist-tv-shows/me?page=0&size=20&language=${currentLang}`
+        : `${API_BASE_URL}/watchlist-tv-shows/${currentProfileUserId}/user?page=0&size=20&language=${currentLang}`;
+
+    fetchAndRender(movieUrl, 'movies-slider', true);
+    fetchAndRender(tvUrl, 'tv-shows-slider', false);
 }
 
 async function fetchAndRender(url, containerId, isMovie) {
@@ -60,15 +95,19 @@ async function fetchAndRender(url, containerId, isMovie) {
         const items = data.content || [];
         const total = data.page?.totalElements || data.totalElements || 0;
 
-        document.getElementById(isMovie ? 'total-movies' : 'total-tv').innerText = total;
+        const totalEl = document.getElementById(isMovie ? 'total-movies' : 'total-tv');
+        if (totalEl) totalEl.innerText = total;
 
         const container = document.getElementById(containerId);
+        if (!container) return;
         container.innerHTML = '';
 
         if (items.length === 0) {
-            container.innerHTML = `<div class="empty-state" style="width:100%"><h3>Тут поки порожньо</h3></div>`;
+            container.innerHTML = `<div class="empty-state" style="width:100%"><h3 data-i18n="no-results">${translations[currentLang]['no-results']}</h3></div>`;
             return;
         }
+
+        const detailBtnText = translations[currentLang]['more-details'];
 
         items.forEach(item => {
             const id = isMovie ? item.movieId : item.tvShowId;
@@ -80,19 +119,17 @@ async function fetchAndRender(url, containerId, isMovie) {
             container.insertAdjacentHTML('beforeend', `
                 <div class="movie-card" onclick="openItemModal(${id}, ${isMovie})">
                     <div style="position:relative">
-                        <img src="${IMG_500}${item.posterUrl || item.posterPath || ''}" onerror="this.src='https://via.placeholder.com/500x750?text=No+Image'">
+                        <img src="${IMG_500}${item.posterUrl || item.posterPath || ''}" onerror="this.src='https://placehold.co/500x750/333333/ffffff?text=No+Image'">
                         ${badge}
                     </div>
                     <div class="movie-card-body">
                         <div class="movie-title" title="${title}">${title}</div>
-                        <button class="btn-detail-card">Детально</button>
+                        <button class="btn-detail-card">${detailBtnText}</button>
                     </div>
                 </div>
             `);
         });
-    } catch (e) {
-        console.error(e);
-    }
+    } catch (e) { console.error(e); }
 }
 
 // =======================
@@ -101,50 +138,50 @@ async function fetchAndRender(url, containerId, isMovie) {
 function openItemModal(id, isMovie) {
     const data = isMovie ? loadedMovies[id] : loadedTvShows[id];
     if (!data) return;
-    activeModalData = { ...data, isMovie };
+    activeModalData = {...data, isMovie};
+    const t = translations[currentLang];
 
     if (isMovie) {
         document.getElementById('movie-modal-title').innerText = data.title;
         document.getElementById('movie-modal-poster').src = data.posterUrl ? `${IMG_500}${data.posterUrl}` : '';
-        document.getElementById('movie-modal-year').innerText = `Рік: ${data.releaseDate ? data.releaseDate.substring(0,4) : '...'}`;
-
-        // НОВЫЕ ПОЛЯ ФИЛЬМА
-        document.getElementById('movie-modal-country').innerText = `Країна: ${formatList(data.productionCountries)}`;
-        document.getElementById('movie-modal-runtime').innerText = data.runtime ? `${data.runtime} хв` : '...';
+        document.getElementById('movie-modal-year').innerText = `${t['year-label']}: ${data.releaseDate ? data.releaseDate.substring(0, 4) : '...'}`;
+        document.getElementById('movie-modal-country').innerText = `${t['country-label']}: ${formatList(data.productionCountries)}`;
+        document.getElementById('movie-modal-runtime').innerText = `${data.runtime || '...'} ${t['runtime-label']}`;
         document.getElementById('movie-modal-genres').innerHTML = formatGenres(data.genres);
         document.getElementById('movie-modal-rating').innerHTML = `★ ${data.voteAverage ? data.voteAverage.toFixed(1) : 'NR'}`;
 
-        // Умное описание
         setupOverview('movie-modal-overview', 'movie-read-more', data.overview);
 
         const deleteBtn = document.getElementById('btn-delete-movie');
-        deleteBtn.style.display = isMyProfile ? 'block' : 'none';
-        deleteBtn.onclick = () => deleteItem(data.movieId, true);
+        if (deleteBtn) {
+            deleteBtn.style.display = isMyProfile ? 'block' : 'none';
+            deleteBtn.onclick = () => deleteItem(data.movieId, true);
+        }
 
         document.getElementById('movie-modal').classList.add('show');
         document.body.classList.add('modal-open');
     } else {
         document.getElementById('modal-title').innerText = data.name;
         document.getElementById('modal-poster').src = data.posterUrl ? `${IMG_500}${data.posterUrl}` : '';
-        document.getElementById('modal-year').innerText = `Рік: ${data.firstAirDate ? data.firstAirDate.substring(0,4) : '...'}`;
+        document.getElementById('modal-year').innerText = `${t['year-label']}: ${data.firstAirDate ? data.firstAirDate.substring(0, 4) : '...'}`;
 
-        // НОВЫЕ ПОЛЯ СЕРИАЛА
-        // Используем fallbacks, если в старых данных поля назывались иначе
         const countries = data.productionCountries || data.originCountry || [];
-        document.getElementById('modal-country').innerText = `Країна: ${formatList(Array.isArray(countries) ? countries : [countries])}`;
+        document.getElementById('modal-country').innerText = `${t['country-label']}: ${formatList(Array.isArray(countries) ? countries : [countries])}`;
         document.getElementById('modal-genres').innerHTML = formatGenres(data.genres);
         document.getElementById('modal-rating').innerHTML = `★ ${data.voteAverage ? data.voteAverage.toFixed(1) : 'NR'}`;
 
-        document.getElementById('modal-status-text').innerText = `Сезон ${data.currentSeason}, Серія ${data.currentEpisode}`;
+        const seasonWord = currentLang === 'en' ? 'Season' : (currentLang === 'uk' ? 'Сезон' : 'Сезон');
+        const episodeWord = currentLang === 'en' ? 'Episode' : (currentLang === 'uk' ? 'Серія' : 'Серия');
+        document.getElementById('modal-status-text').innerText = `${seasonWord} ${data.currentSeason}, ${episodeWord} ${data.currentEpisode}`;
 
-        // Умное описание
         setupOverview('modal-overview', 'tv-read-more', data.overview);
-
         renderProgressSeasons(data);
 
         const deleteBtn = document.getElementById('btn-delete-tv');
-        deleteBtn.style.display = isMyProfile ? 'block' : 'none';
-        deleteBtn.onclick = () => deleteItem(data.tvShowId, false);
+        if (deleteBtn) {
+            deleteBtn.style.display = isMyProfile ? 'block' : 'none';
+            deleteBtn.onclick = () => deleteItem(data.tvShowId, false);
+        }
 
         document.getElementById('progress-modal').classList.add('show');
         document.body.classList.add('modal-open');
@@ -153,8 +190,10 @@ function openItemModal(id, isMovie) {
 
 function renderProgressSeasons(data) {
     const tabsContainer = document.getElementById('season-tabs');
+    if (!tabsContainer) return;
     tabsContainer.innerHTML = '';
     const seasonsList = data.seasons || [];
+    const seasonWord = currentLang === 'en' ? 'Season' : 'Сезон';
 
     seasonsList.forEach(seasonObj => {
         const sNum = seasonObj.season_number ?? seasonObj.seasonNumber;
@@ -162,7 +201,7 @@ function renderProgressSeasons(data) {
 
         const btn = document.createElement('button');
         btn.className = 'season-tab';
-        btn.innerText = `Сезон ${sNum}`;
+        btn.innerText = `${seasonWord} ${sNum}`;
 
         const isFullyWatched = sNum < data.currentSeason || (sNum === data.currentSeason && data.currentEpisode >= totalEps);
         if (isFullyWatched) btn.classList.add('watched');
@@ -182,10 +221,14 @@ function renderProgressSeasons(data) {
 
 function renderProgressEpisodes(sNum, data) {
     const grid = document.getElementById('episodes-grid');
+    const titleEl = document.getElementById('episodes-title');
+    if (!grid) return;
     grid.innerHTML = '';
 
-    const titleEl = document.getElementById('episodes-title');
-    if (titleEl) titleEl.innerText = `Епізоди ${sNum} сезону`;
+    const episodeWord = currentLang === 'en' ? 'Episodes of' : (currentLang === 'uk' ? 'Епізоди' : 'Эпизоды');
+    const seasonWord = currentLang === 'en' ? 'season' : (currentLang === 'uk' ? 'сезону' : 'сезона');
+
+    if (titleEl) titleEl.innerText = `${episodeWord} ${sNum} ${seasonWord}`;
 
     const seasonData = (data.seasons || []).find(s => (s.season_number ?? s.seasonNumber) === sNum);
     const totalEps = seasonData ? (seasonData.episode_count ?? seasonData.episodeCount ?? 10) : 10;
@@ -206,26 +249,27 @@ function renderProgressEpisodes(sNum, data) {
 // =======================
 async function deleteItem(id, isMovie) {
     if (!isMyProfile) return;
-    if (!confirm("Ви впевнені, що хочете видалити це зі списку?")) return;
+    const confirmMsg = currentLang === 'en' ? "Are you sure?" : (currentLang === 'uk' ? "Ви впевнені?" : "Вы уверены?");
+    if (!confirm(confirmMsg)) return;
 
     const endpoint = isMovie ? `/watchlist-movies?movieId=${id}` : `/watchlist-tv-shows?tvShowId=${id}`;
 
     try {
         const response = await fetch(API_BASE_URL + endpoint, {method: 'DELETE'});
         if (response.ok) {
-            showToast("Успішно видалено!");
+            showToast(translations[currentLang]['toast-success']);
             closeModal(isMovie ? 'movie-modal' : 'progress-modal');
             loadDashboard();
 
             if (document.getElementById('full-grid-modal').classList.contains('show')) {
-                openFullGrid(gridType);
+                gridPage = 0;
+                document.getElementById('full-grid-content').innerHTML = '';
+                loadGridPage();
             }
         } else {
-            showToast("Помилка видалення", true);
+            showToast(translations[currentLang]['toast-error'], true);
         }
-    } catch (e) {
-        showToast("Помилка сервера", true);
-    }
+    } catch (e) { showToast("Error", true); }
 }
 
 // =======================
@@ -234,8 +278,19 @@ async function deleteItem(id, isMovie) {
 function openFullGrid(type) {
     gridType = type;
     gridPage = 0;
-    document.getElementById('full-grid-content').innerHTML = '';
-    document.getElementById('full-grid-title').innerText = type === 'movies' ? 'Всі збережені фільми' : 'Всі збережені серіали';
+    currentGridQuery = '';
+
+    const searchInput = document.getElementById('grid-search-input');
+    if (searchInput) searchInput.value = '';
+
+    const content = document.getElementById('full-grid-content');
+    const title = document.getElementById('full-grid-title');
+    if (content) content.innerHTML = '';
+
+    if (title) {
+        title.innerText = type === 'movies' ? translations[currentLang]['all-saved-title'] : translations[currentLang]['all-saved-title'];
+    }
+
     document.getElementById('full-grid-modal').classList.add('show');
     document.body.classList.add('modal-open');
     loadGridPage();
@@ -244,121 +299,74 @@ function openFullGrid(type) {
 async function loadGridPage() {
     if (isGridLoading) return;
     isGridLoading = true;
-    document.getElementById('grid-load-status').innerText = 'Завантаження...';
+    const status = document.getElementById('grid-load-status');
+    if (status) status.innerText = translations[currentLang]['loading'];
 
     const isMovie = gridType === 'movies';
-    const endpoint = isMovie ? `/watchlist-movies/me` : `/watchlist-tv-shows/me`;
+    const basePath = isMovie ? `/watchlist-movies` : `/watchlist-tv-shows`;
+    let endpoint = '';
+
+    // ЛОГИКА ФОРМИРОВАНИЯ URL
+    if (currentGridQuery.length > 0) {
+        // РАБОТАЕТ ПОИСК
+        // Стучимся на твой новый эндпоинт поиска (без userId, бэкенд берет из сессии)
+        endpoint = `${basePath}/search/${encodeURIComponent(currentGridQuery)}?page=${gridPage}&size=20&language=${currentLang}`;
+    } else {
+        // ПРОСТО ЛИСТАЕМ КАРТОТЕКУ
+        endpoint = isMyProfile
+            ? `${basePath}/me?page=${gridPage}&size=20&language=${currentLang}`
+            : `${basePath}/${currentProfileUserId}/user?page=${gridPage}&size=20&language=${currentLang}`;
+    }
 
     try {
-        const response = await fetch(`${API_BASE_URL}${endpoint}?page=${gridPage}&size=20&language=${currentLang}`);
-        if (!response.ok) return;
+        const response = await fetch(`${API_BASE_URL}${endpoint}`);
+        if (!response.ok) throw new Error("Server error");
 
         const data = await response.json();
         const items = data.content || [];
         gridTotalPages = data.page?.totalPages || data.totalPages || 1;
 
         const container = document.getElementById('full-grid-content');
+        const detailBtnText = translations[currentLang]['more-details'];
+
+        if (items.length === 0 && gridPage === 0) {
+            container.innerHTML = `<h3 style="color: white; text-align: center; width: 100%; grid-column: 1 / -1;">${translations[currentLang]['no-results']}</h3>`;
+        }
 
         items.forEach(item => {
             const id = isMovie ? item.movieId : item.tvShowId;
             const title = isMovie ? item.title : item.name;
-            if (isMovie) loadedMovies[id] = item; else loadedTvShows[id] = item;
-
             const badge = !isMovie ? `<div style="position:absolute; top:8px; left:8px; background:var(--primary-color); color:white; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:bold;">S${item.currentSeason} E${item.currentEpisode}</div>` : '';
+
+            // Сохраняем в кэш
+            if (isMovie) loadedMovies[id] = item; else loadedTvShows[id] = item;
 
             container.insertAdjacentHTML('beforeend', `
                 <div class="movie-card" onclick="openItemModal(${id}, ${isMovie})">
                     <div style="position:relative">
-                        <img src="${IMG_500}${item.posterUrl || item.posterPath || ''}" onerror="this.src='https://via.placeholder.com/500x750?text=No+Image'">
+                        <img src="${IMG_500}${item.posterUrl || item.posterPath || ''}" onerror="this.src='https://placehold.co/500x750/333333/ffffff?text=No+Image'">
                         ${badge}
                     </div>
                     <div class="movie-card-body">
                         <div class="movie-title" title="${title}">${title}</div>
-                        <button class="btn-detail-card">Детально</button>
+                        <button class="btn-detail-card">${detailBtnText}</button>
                     </div>
                 </div>
             `);
         });
 
-        document.getElementById('grid-load-status').innerText = gridPage >= gridTotalPages - 1 ? 'Кінець списку' : '';
+        if (status) status.innerText = gridPage >= gridTotalPages - 1 ? "" : "";
     } catch (e) {
-        document.getElementById('grid-load-status').innerText = 'Помилка';
+        if (status) status.innerText = "Error";
     } finally {
         isGridLoading = false;
     }
 }
 
-document.getElementById('grid-scroll-container').addEventListener('scroll', function () {
+document.getElementById('grid-scroll-container')?.addEventListener('scroll', function () {
     if (isGridLoading || gridPage >= gridTotalPages - 1) return;
     if (this.scrollHeight - this.scrollTop <= this.clientHeight + 200) {
         gridPage++;
         loadGridPage();
     }
 });
-
-function closeModal(modalId) {
-    document.getElementById(modalId).classList.remove('show');
-    checkBodyScroll(); // Проверяем, можно ли вернуть скролл
-}
-
-// Закрытие при клике на темный фон (в пустоту)
-window.addEventListener('click', (e) => {
-    // Если кликнули ровно по оверлею (а не по контенту внутри)
-    if (e.target.classList.contains('modal-overlay')) {
-        e.target.classList.remove('show'); // Закрываем ту модалку, по которой кликнули
-        checkBodyScroll();
-    }
-});
-
-// Проверка: остались ли еще открытые модалки?
-function checkBodyScroll() {
-    // Если открытых модалок больше нет - возвращаем скролл главной странице
-    if (document.querySelectorAll('.modal-overlay.show').length === 0) {
-        document.body.classList.remove('modal-open');
-    }
-}
-
-// Помощник для красивого вывода списков (стран)
-function formatList(list) {
-    if (!list || !Array.isArray(list) || list.length === 0) return '...';
-    return list.join(', ');
-}
-
-// Помощник для создания плашек жанров
-function formatGenres(genres) {
-    if (!genres || !Array.isArray(genres) || genres.length === 0) return '';
-    return genres.map(g => `<span class="genre-tag">${g}</span>`).join('');
-}
-
-// Логика разворачивания текста
-function toggleOverview(textId, btn) {
-    const textEl = document.getElementById(textId);
-    if (textEl.classList.contains('collapsed')) {
-        textEl.classList.remove('collapsed');
-        textEl.classList.add('expanded');
-        btn.innerText = 'Згорнути';
-    } else {
-        textEl.classList.remove('expanded');
-        textEl.classList.add('collapsed');
-        btn.innerText = 'Читати далі';
-    }
-}
-
-// Умная настройка описания (скрывает кнопку, если текст короткий)
-function setupOverview(textId, btnId, text) {
-    const textEl = document.getElementById(textId);
-    const btnEl = document.getElementById(btnId);
-
-    textEl.innerText = text || 'Опис відсутній.';
-    textEl.classList.remove('expanded');
-    textEl.classList.add('collapsed');
-    btnEl.innerText = 'Читати далі';
-    btnEl.style.display = 'none'; // Прячем кнопку по умолчанию
-
-    // Ждем миллисекунду, пока браузер отрисует текст, и проверяем его реальную высоту
-    setTimeout(() => {
-        if (textEl.scrollHeight > textEl.clientHeight) {
-            btnEl.style.display = 'inline-block'; // Показываем кнопку, если текст не влез
-        }
-    }, 10);
-}

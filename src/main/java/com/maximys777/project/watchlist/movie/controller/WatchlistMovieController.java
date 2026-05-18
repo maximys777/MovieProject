@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+
 @RestController
 @RequestMapping("/watchlist-movies")
 @RequiredArgsConstructor
@@ -46,6 +47,14 @@ public class WatchlistMovieController {
                                                             Pageable pageable,
                                                             @RequestParam LanguageType language) {
         return watchlistMovieService.getAuthenticatedUserWatchlist(oidcUser, pageable, language);
+    }
+
+    @GetMapping("/search/{movieName}")
+    public Page<WatchlistMovieResponse> findMovieInUsersWatchlist(@PathVariable String movieName,
+                                                                  @AuthenticationPrincipal OidcUser oidcUser,
+                                                                  @RequestParam LanguageType language,
+                                                                  Pageable pageable) {
+        return watchlistMovieService.findMovieInUsersWatchlist(oidcUser, movieName, language, pageable);
     }
 
     @DeleteMapping
