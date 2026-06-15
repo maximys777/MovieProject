@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Mono;
 
 @RestController
 @RequestMapping("/watchlist-tv-shows")
@@ -35,14 +36,14 @@ public class WatchlistTvShowController {
     }
 
     @GetMapping("/{userId}/user")
-    public Page<WatchlistTvShowResponse> getUsersWatchlistTvShows(@PathVariable Long userId,
-                                                                  Pageable pageable,
-                                                                  @RequestParam LanguageType language) {
+    public Mono<Page<WatchlistTvShowResponse>> getUsersWatchlistTvShows(@PathVariable Long userId,
+                                                                        Pageable pageable,
+                                                                        @RequestParam LanguageType language) {
         return watchlistTvShowService.findUsersWatchlistTvShow(userId, pageable, language);
     }
 
     @GetMapping("/me")
-    public Page<WatchlistTvShowResponse> getMyWatchlistTvShows(@AuthenticationPrincipal OidcUser oidcUser,
+    public Mono<Page<WatchlistTvShowResponse>> getMyWatchlistTvShows(@AuthenticationPrincipal OidcUser oidcUser,
                                                                Pageable pageable,
                                                                @RequestParam LanguageType language) {
         return watchlistTvShowService.getAuthenticatedUserWatchlist(oidcUser, pageable, language);

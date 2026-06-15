@@ -29,14 +29,6 @@ public class WatchlistTvShowEntity {
 
     private Long tvShowId;
 
-    private String name;
-
-    private String posterUrl;
-
-    private String firstAirDate;
-
-    private String originCountry;
-
     private Integer currentSeason;
 
     private Integer currentEpisode;

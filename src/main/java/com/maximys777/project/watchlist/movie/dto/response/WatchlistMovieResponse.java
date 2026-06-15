@@ -1,5 +1,6 @@
 package com.maximys777.project.watchlist.movie.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Builder;
 
 import java.time.LocalDateTime;
@@ -13,10 +14,15 @@ public record WatchlistMovieResponse(
         String overview,
         Integer runtime,
         Long movieId,
-        LocalDateTime releaseDate,
+        String releaseDate,
         Double voteAverage,
         Long userId,
         List<String> genres,
-        List<String> productionCountries
+        List<String> productionCountries,
+        LocalDateTime addedDate
 ) {
+    @JsonIgnore
+    public LocalDateTime addedDate() {
+        return addedDate;
+    }
 }

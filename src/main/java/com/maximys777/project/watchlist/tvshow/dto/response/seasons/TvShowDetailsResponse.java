@@ -12,10 +12,11 @@ import java.util.List;
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public record TvShowDetailsResponse(
         Long id,
-        Long tvShowId,
         String name,
+        String posterPath,
         String overview,
         Double voteAverage,
+        String firstAirDate,
         Integer numberOfEpisodes,
         Integer numberOfSeasons,
         List<GenreResponse> genres,

@@ -205,3 +205,9 @@ body.modal-open {
     padding: 5px 0; cursor: pointer; font-size: 14px; margin-top: 5px;
 }
 .btn-read-more:hover { color: var(--primary-color); text-decoration: underline; }
+
+#movie-modal,
+#tv-modal,
+#progress-modal {
+    z-index: 2050 !important;
+}

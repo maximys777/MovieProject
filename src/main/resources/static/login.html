@@ -3,71 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Вхід - КиноТренды</title>
+    <title data-i18n="login-title">Вхід - КиноТренды</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="/js/translations.js"></script>
     <style>
-        :root {
-            --bg-color: #0b0b0d;
-            --card-bg: #16161a;
-            --text-color: #f1f1f1;
-            --primary-color: #e50914;
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-image: radial-gradient(circle at top, #1e1e24 0%, var(--bg-color) 70%);
-        }
-
-        .login-container {
-            background: var(--card-bg);
-            padding: 50px 40px;
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            text-align: center;
-            width: 100%;
-            max-width: 400px;
-            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.5);
-        }
-
+        :root { --bg-color: #0b0b0d; --card-bg: #16161a; --text-color: #f1f1f1; --primary-color: #e50914; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-color); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-image: radial-gradient(circle at top, #1e1e24 0%, var(--bg-color) 70%); }
+        .login-container { background: var(--card-bg); padding: 50px 40px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.05); text-align: center; width: 100%; max-width: 400px; box-shadow: 0 15px 30px rgba(0, 0, 0, 0.5); position: relative;}
+        .login-lang { position: absolute; top: 15px; right: 15px; }
         h1 { font-size: 28px; margin: 0 0 10px 0; font-weight: 900; }
         h1 span { color: var(--primary-color); }
-
         p { color: #8b8b99; margin-bottom: 35px; font-size: 15px; line-height: 1.5; }
-
-        .google-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: white;
-            color: #333;
-            text-decoration: none;
-            padding: 14px;
-            border-radius: 6px;
-            font-weight: bold;
-            transition: 0.2s;
-            font-size: 16px;
-            gap: 12px;
-        }
-
-        .google-btn:hover {
-            background: #f1f1f1;
-            transform: scale(1.02);
-        }
-
+        .google-btn { display: flex; align-items: center; justify-content: center; background: white; color: #333; text-decoration: none; padding: 14px; border-radius: 6px; font-weight: bold; transition: 0.2s; font-size: 16px; gap: 12px; }
+        .google-btn:hover { background: #f1f1f1; transform: scale(1.02); }
         .google-icon { width: 24px; height: 24px; }
     </style>
 </head>
 <body>
 
 <div class="login-container">
+    <div class="login-lang">
+        <select id="langSelect" class="lang-select" onchange="changeLanguage(this.value)">
+            <option value="en">EN</option>
+            <option value="ru">RU</option>
+            <option value="uk">UK</option>
+        </select>
+    </div>
     <h1>Кино<span>Тренды</span></h1>
-    <p>Увійдіть, щоб зберігати улюблені фільми та відстежувати прогрес серіалів</p>
+    <p data-i18n="login-desc">Увійдіть, щоб зберігати улюблені фільми та відстежувати прогрес серіалів</p>
 
     <a href="/oauth2/authorization/google" class="google-btn">
         <svg class="google-icon" viewBox="0 0 48 48">
@@ -76,9 +39,10 @@
             <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
             <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
         </svg>
-        Увійти через Google
+        <span data-i18n="login-google">Увійти через Google</span>
     </a>
 </div>
 
+<script src="/js/main.js"></script>
 </body>
 </html>

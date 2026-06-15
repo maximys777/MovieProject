@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Результати пошуку - КиноТренды</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="/js/translations.js"></script>
+</head>
+<body>
+
+<nav class="navbar">
+    <a href="/" class="navbar-logo">Кино<span>Тренды</span></a>
+    <div class="nav-links">
+        <a href="index.html" data-i18n="nav-home">Головна</a>
+
+        <div class="search-container">
+            <input type="text" id="search-input" class="search-input" data-i18n="search-placeholder" placeholder="Шукати фільми та серіали..." autocomplete="off">
+            <div id="search-spinner" class="search-spinner hidden"></div>
+            <div id="search-dropdown" class="search-dropdown hidden">
+                <div id="search-results"></div>
+                <button id="btn-view-all-search" class="btn-view-all-search hidden" onclick="goToSearchPage()" data-i18n="btn-all-results">
+                    Дивитися всі результати
+                </button>
+            </div>
+        </div>
+
+        <select id="langSelect" class="lang-select" onchange="changeLanguage(this.value)">
+            <option value="en">EN</option>
+            <option value="ru">RU</option>
+            <option value="uk">UK</option>
+        </select>
+        <a href="profile.html" class="profile-link">
+            <img src="https://ui-avatars.com/api/?name=User&background=e50914&color=fff" alt="Аватар" class="avatar">
+        </a>
+    </div>
+</nav>
+
+<div class="content-wrapper">
+    <div class="section-header" style="margin-top: 40px; margin-bottom: 30px;">
+        <h2><span data-i18n="search-results-for">Результати пошуку за запитом:</span> <span id="search-query-display" style="color: var(--primary-color);">...</span></h2>
+    </div>
+
+    <div id="movies-grid"></div>
+    <div id="search-load-status" class="loading-status" data-i18n="loading">Завантаження...</div>
+</div>
+
+<div id="movie-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 650px;">
+        <div class="modal-body">
+            <div class="modal-header-info">
+                <div style="position: relative; flex-shrink: 0;">
+                    <img id="movie-modal-poster" src="" alt="Постер">
+                    <div id="movie-modal-rating" class="modal-rating-badge">★ 0.0</div>
+                </div>
+                <div class="modal-details">
+                    <h2 id="movie-modal-title">Название фильма</h2>
+                    <div class="modal-tags">
+                        <span id="movie-modal-year">...</span>
+                        <span id="movie-modal-country">...</span>
+                        <span id="movie-modal-runtime">...</span>
+                    </div>
+                    <div id="movie-modal-genres" class="modal-genres"></div>
+                </div>
+            </div>
+            <div class="modal-movie-overview">
+                <h3 style="margin-bottom: 10px; font-size: 18px; color: white;" data-i18n="modal-about">Про фільм</h3>
+                <div class="overview-wrapper">
+                    <p id="movie-modal-overview" class="modal-overview-text collapsed">Опис...</p>
+                    <button id="movie-read-more" class="btn-read-more" data-i18n="modal-read-more" onclick="toggleOverview('movie-modal-overview', this)">Читати далі</button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" onclick="closeMovieModal()" data-i18n="modal-cancel">Скасувати</button>
+            <button class="btn-save" onclick="saveMovieToWatchlist()" data-i18n="modal-save">Додати до списку</button>
+        </div>
+    </div>
+</div>
+
+<div id="tv-modal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-body">
+            <div class="modal-header-info">
+                <img id="modal-poster" src="" alt="Постер">
+                <div class="modal-details">
+                    <h2 id="modal-title">Название сериала</h2>
+                    <div class="modal-tags">
+                        <span id="modal-year">...</span>
+                        <span id="modal-country">...</span>
+                        <span id="modal-seasons-count">...</span>
+                    </div>
+
+                    <div id="tv-modal-genres" class="modal-genres"></div>
+
+                    <p id="modal-overview" class="modal-description">Опис...</p>
+                </div>
+            </div>
+            <div class="modal-progress-section">
+                <div class="progress-header">
+                    <h3 data-i18n="modal-episodes">Відмітити переглянуте</h3>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="check-all-season" onchange="toggleAllEpisodes(this)">
+                        <span data-i18n="modal-all-season">Обрати весь сезон</span>
+                    </label>
+                </div>
+                <div id="season-tabs" class="season-tabs"></div>
+                <div id="episodes-grid" class="episodes-grid"></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" onclick="closeModal()" data-i18n="modal-cancel">Скасувати</button>
+            <button class="btn-save" onclick="saveTvShowProgress()" data-i18n="modal-save">Зберегти</button>
+        </div>
+    </div>
+</div>
+
+<div id="custom-toast" class="toast-notification">Успешно!</div>
+
+<script src="/js/main.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const query = urlParams.get('query');
+
+        // Устанавливаем язык при загрузке
+        const langSelect = document.getElementById('langSelect');
+        if (langSelect) langSelect.value = currentLang;
+
+        if (query) {
+            document.getElementById('search-query-display').textContent = `«${query}»`;
+            loadFullSearchResults(query);
+        } else {
+            document.getElementById('search-load-status').textContent = translations[currentLang]['search-enter-query'] || 'Введите запрос.';
+        }
+    });
+
+    async function loadFullSearchResults(query) {
+        const grid = document.getElementById('movies-grid');
+        const status = document.getElementById('search-load-status');
+        const lang = currentLang || localStorage.getItem('app_language') || 'ru';
+
+        try {
+            const response = await fetch(`/search/full?query=${encodeURIComponent(query)}&language=${lang}&page=1`);
+            if (!response.ok) throw new Error('Помилка сервера');
+
+            const data = await response.json();
+            status.classList.add('hidden');
+            grid.innerHTML = '';
+
+            const filteredResults = (data.results || []).filter(item => {
+                const type = item.mediaType || item.media_type;
+                return type === 'movie' || type === 'tv';
+            });
+
+            if (filteredResults.length === 0) {
+                grid.innerHTML = `<h3 style="color: white; grid-column: 1 / -1; text-align: center;">${translations[lang]['no-results']}</h3>`;
+                return;
+            }
+
+            filteredResults.forEach(item => {
+                const type = item.mediaType || item.media_type;
+                const title = type === 'movie' ? (item.title || item.name) : (item.name || item.title);
+                const poster = item.posterPath || item.poster_path;
+                const vote = item.voteAverage || item.vote_average;
+
+                const typeText = type === 'movie' ? translations[lang]['film'] : translations[lang]['tv-show'];
+                const detailBtnText = translations[lang]['more-details'];
+
+                const genresList = item.genreNames || item.genre_names || [];
+                const genresHtml = genresList.length > 0
+                    ? `<div style="font-size: 11px; color: #888; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${genresList.join(', ')}</div>`
+                    : '';
+
+                const posterUrl = poster ? `https://image.tmdb.org/t/p/w500${poster}` : 'https://placehold.co/500x750/333333/ffffff?text=No+Image';
+                const rating = vote ? vote.toFixed(1) : '0.0';
+
+                const compatibleItem = {
+                    id: item.id,
+                    title: title,
+                    name: title,
+                    poster_path: poster,
+                    release_date: item.releaseDate || item.release_date,
+                    first_air_date: item.firstAirDate || item.first_air_date,
+                    vote_average: vote,
+                    overview: item.overview || 'Опис відсутній.',
+                    popularity: item.popularity || 0.0,
+                    origin_country: item.originCountry || item.origin_country
+                };
+
+                const encodedItem = encodeURIComponent(JSON.stringify(compatibleItem)).replace(/'/g, "%27");
+
+                const card = document.createElement('div');
+                card.className = 'movie-card';
+
+                // ВОТ ЗДЕСЬ ИСПРАВЛЕННЫЙ КОД БЕЗ ТРОЕТОЧИЙ
+                card.innerHTML = `
+                <div style="position:relative">
+                    <img src="${posterUrl}" alt="${title}" onerror="this.src='https://placehold.co/500x750/333333/ffffff?text=No+Image'">
+                    <span class="rating-badge">★ ${rating}</span>
+                </div>
+                <div class="movie-card-body">
+                    <div class="movie-title" title="${title}">${title}</div>
+                    <div style="font-size: 12px; color: #8b8b99; margin-bottom: 4px; font-weight: bold;">
+                        ${typeText}
+                    </div>
+                    ${genresHtml}
+                    <button style="width:100%; padding:8px; background:var(--primary-color); border:none; color:white; border-radius:4px; cursor:pointer;"
+                            onclick="openDetailsFromSearch(this, '${encodedItem}', '${type}')">
+                        ${detailBtnText}
+                    </button>
+                </div>
+                `;
+                grid.appendChild(card);
+            });
+
+        } catch (error) {
+            console.error(error);
+            status.textContent = translations[lang]['toast-error'] || 'Ошибка при загрузке.';
+        }
+    }
+
+    function openDetailsFromSearch(btnElement, encodedItemStr, type) {
+        const item = JSON.parse(decodeURIComponent(encodedItemStr));
+        if (type === 'movie') {
+            if (typeof openMovieModal === 'function') openMovieModal(item, btnElement);
+        } else {
+            if (typeof openTvModal === 'function') openTvModal(item);
+        }
+    }
+</script>
+
+</body>
+</html>

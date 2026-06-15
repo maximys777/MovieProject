@@ -5,6 +5,9 @@ import com.maximys777.project.tmdb.common.TimeWindow;
 import com.maximys777.project.tmdb.dto.response.movie.MovieDetails;
 import com.maximys777.project.tmdb.dto.response.movie.TrendMovieResponse;
 import com.maximys777.project.tmdb.dto.response.movie.TrendingMovieResultResponse;
+import com.maximys777.project.tmdb.dto.response.search.GenreListResponse;
+import com.maximys777.project.tmdb.dto.response.search.MultiSearchDetailsResponse;
+import com.maximys777.project.tmdb.dto.response.search.MultiSearchResponse;
 import com.maximys777.project.tmdb.dto.response.tvshow.TrendTvShowResponse;
 import com.maximys777.project.tmdb.dto.response.tvshow.TvShowResultResponse;
 import com.maximys777.project.watchlist.tvshow.dto.response.seasons.SeasonResponse;
@@ -27,7 +30,7 @@ import java.util.List;
 public class TMDBService {
     private final WebClient tmdbWebClient;
 
-    @Cacheable(value = "movies", key = "{#timeWindow, #page, #language}")
+    @Cacheable(value = "trendMovies", key = "{#timeWindow, #page, #language}")
     public Flux<TrendMovieResponse> getTrendingMovies(TimeWindow timeWindow, int page, LanguageType language) {
         return tmdbWebClient.get()
                 .uri("/trending/movie/{timeWindow}?page={page}&language={language}", timeWindow, page, language)
@@ -49,7 +52,7 @@ public class TMDBService {
                                 new RuntimeException("Service unavailable after" + retryBackoffSpec.maxAttempts + " attempts", retrySignal.failure())));
     }
 
-    @Cacheable(value = "tvShows", key = "{#timeWindow, #page, #language}")
+    @Cacheable(value = "trendTvShows", key = "{#timeWindow, #page, #language}")
     public Flux<TrendTvShowResponse> getTrendingTvShows(TimeWindow timeWindow, int page, LanguageType language) {
         return tmdbWebClient.get()
                 .uri("/trending/tv/{timeWindow}?page={page}&language={language}", timeWindow, page, language)
@@ -84,10 +87,11 @@ public class TMDBService {
 
                     return new TvShowDetailsResponse(
                             response.id(),
-                            response.tvShowId(),
                             response.name(),
+                            response.posterPath(),
                             response.overview(),
                             response.voteAverage(),
+                            response.firstAirDate(),
                             response.numberOfEpisodes(),
                             response.numberOfSeasons(),
                             response.genres(),
@@ -112,6 +116,41 @@ public class TMDBService {
                 .bodyToMono(MovieDetails.class)
                 .retryWhen(Retry.backoff(3, Duration.ofSeconds(2))
                         .filter(this::isRetryableError));
+    }
+
+    @Cacheable(value = "movieGenres", key = "#language")
+    public Mono<GenreListResponse> getMovieGenres(LanguageType language) {
+        return tmdbWebClient.get()
+                .uri("/genre/movie/list?language={language}", language)
+                .retrieve()
+                .bodyToMono(GenreListResponse.class)
+                .retryWhen(Retry.backoff(3, Duration.ofSeconds(2))
+                        .filter(this::isRetryableError));
+    }
+
+    @Cacheable(value = "tvShowGenres", key = "#language")
+    public Mono<GenreListResponse> getTvGenres(LanguageType language) {
+        return tmdbWebClient.get()
+                .uri("/genre/tv/list?language={language}", language)
+                .retrieve()
+                .bodyToMono(GenreListResponse.class)
+                .retryWhen(Retry.backoff(3, Duration.ofSeconds(2))
+                        .filter(this::isRetryableError));
+    }
+
+    public Mono<MultiSearchResponse> multiSearch(String query, LanguageType language, int page) {
+        return tmdbWebClient.get()
+                .uri("/search/multi?query={query}&language={language}&page={page}", query, language, page)
+                .retrieve()
+                .bodyToMono(MultiSearchResponse.class)
+                .map(response -> {
+                    List<MultiSearchDetailsResponse> filteredResponse = response.results().stream()
+                            .filter(item -> item.voteAverage() != null && item.voteAverage() > 0.0 ||
+                                    item.posterPath() != null && !item.posterPath().isEmpty())
+                            .toList();
+
+                    return new MultiSearchResponse(page, filteredResponse, response.totalPages(), response.totalResults());
+                });
     }
 
     private boolean isRetryableError(Throwable throwable) {
