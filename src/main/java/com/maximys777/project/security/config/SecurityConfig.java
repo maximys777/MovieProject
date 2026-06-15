@@ -32,7 +32,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/watchlist-movies/*/user").permitAll()
                         .requestMatchers(HttpMethod.POST, "/watchlist-movies").authenticated()
                         .requestMatchers(HttpMethod.GET, "/watchlist-tv-shows/*/user").permitAll()
-                        .requestMatchers("/", "/index.html", "/js/**", "/css/**", "/login.html", "/details/**", "/trending/**", "/search/**", "/search.html").permitAll()
+                        .requestMatchers("/index.html", "/js/**", "/css/**", "/login.html", "/details/**", "/trending/**", "/search/**", "/search.html").permitAll()
                         .anyRequest().authenticated())
                 .build();
     }
