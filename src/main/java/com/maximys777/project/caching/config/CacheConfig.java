@@ -19,10 +19,12 @@ public class CacheConfig {
         CaffeineCacheManager cacheManager = new CaffeineCacheManager();
 
         // Custom cache with custom time
-        cacheManager.registerCustomCache("movies", buildCache(100, 6, TimeUnit.HOURS));
-        cacheManager.registerCustomCache("tvShows", buildCache(100, 6, TimeUnit.HOURS));
-        cacheManager.registerCustomCache("tvShowDetails", buildCache(1000, 3, TimeUnit.HOURS));
-        cacheManager.registerCustomCache("tvShowDetails", buildCache(100, 3, TimeUnit.DAYS));
+        cacheManager.registerCustomCache("trendMovies", buildCache(100, 6, TimeUnit.HOURS));
+        cacheManager.registerCustomCache("trendTvShows", buildCache(100, 6, TimeUnit.HOURS));
+        cacheManager.registerCustomCache("tvShowDetails", buildCache(1000, 6, TimeUnit.HOURS));
+        cacheManager.registerCustomCache("movieGenres", buildCache(100, 1, TimeUnit.DAYS));
+        cacheManager.registerCustomCache("tvShowGenres", buildCache(100, 1, TimeUnit.DAYS));
+
 
         cacheManager.setAsyncCacheMode(true);
         return cacheManager;

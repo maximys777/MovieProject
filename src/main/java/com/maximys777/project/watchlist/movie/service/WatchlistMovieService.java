@@ -21,7 +21,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -40,11 +43,7 @@ public class WatchlistMovieService {
         }
 
         WatchlistMovieEntity watchlistMovieEntity = WatchlistMovieEntity.builder()
-                .posterUrl(request.posterPath())
-                .title(request.title())
                 .movieId(request.movieId())
-                .releaseDate(request.releaseDate())
-                .popularity(request.popularity())
                 .userId(user.getId())
                 .build();
 
@@ -54,7 +53,7 @@ public class WatchlistMovieService {
     }
 
     // To search user's watchlist for id
-    public Page<WatchlistMovieResponse> findUsersWatchlistMovie(Long userId, Pageable pageable, LanguageType language) {
+    public Mono<Page<WatchlistMovieResponse>> findUsersWatchlistMovie(Long userId, Pageable pageable, LanguageType language) {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
@@ -62,51 +61,47 @@ public class WatchlistMovieService {
     }
 
     // For authenticated user
-    public Page<WatchlistMovieResponse> getAuthenticatedUserWatchlist(OidcUser oidcUser, Pageable pageable, LanguageType language) {
+    public Mono<Page<WatchlistMovieResponse>> getAuthenticatedUserWatchlist(OidcUser oidcUser, Pageable pageable, LanguageType language) {
         UserEntity user = handleUserNotFound(oidcUser.getEmail());
 
         return getWatchlistMovieResponses(pageable, language, user);
     }
 
-    private PageImpl<WatchlistMovieResponse> getWatchlistMovieResponses(Pageable pageable, LanguageType language, UserEntity user) {
-        Page<WatchlistMovieEntity> dtoPage = watchlistMovieRepository.getWatchlistMovieEntityByUserId(user.getId(), pageable);
+    private Mono<Page<WatchlistMovieResponse>> getWatchlistMovieResponses(Pageable pageable,
+                                                                          LanguageType language,
+                                                                          UserEntity user) {
+        Page<WatchlistMovieEntity> entityPage = watchlistMovieRepository
+                .getWatchlistMovieEntityByUserId(user.getId(), pageable);
 
-        List<WatchlistMovieResponse> dataFromTMDB = dtoPage.getContent().stream()
-                .map(entity -> {
-                    try {
-                        MovieDetails tmdbMovie = tmdbService.getMovieDetails(entity.getMovieId(), language).block();
+        Flux<WatchlistMovieEntity> entityFlux = Flux.fromIterable(entityPage.getContent());
 
-                        if (tmdbMovie != null) {
-                            List<String> genreNames = tmdbMovie.genres() != null
-                                    ? tmdbMovie.genres().stream().map(GenreResponse::name).toList()
-                                    : List.of();
+        Mono<List<WatchlistMovieResponse>> responseMono = entityFlux
+                .flatMap(entity ->
+                        tmdbService.getMovieDetails(entity.getMovieId(), language)
+                                .map(movieDetails -> {
+                                    List<String> genres = getGenresFromMovieDetails(movieDetails);
+                                    List<String> companies = getCompaniesFromMovieDetails(movieDetails);
 
-                            List<String> countryName = tmdbMovie.productionCountries() != null
-                                    ? tmdbMovie.productionCountries().stream().map(ProductionCountryResponse::name).toList()
-                                    : List.of();
+                                    return WatchlistMovieResponse.builder()
+                                            .id(entity.getId())
+                                            .posterUrl(movieDetails.posterPath())
+                                            .title(movieDetails.title())
+                                            .overview(movieDetails.overview())
+                                            .runtime(movieDetails.runtime())
+                                            .movieId(entity.getMovieId())
+                                            .releaseDate(movieDetails.releaseDate())
+                                            .voteAverage(movieDetails.voteAverage())
+                                            .userId(user.getId())
+                                            .genres(genres)
+                                            .productionCountries(companies)
+                                            .addedDate(entity.getAddedDate())
+                                            .build();
+                                })
+                                .defaultIfEmpty(watchlistMovieMapper.mapToWatchlistMovieResponse(entity, language)))
+                .sort(Comparator.comparing(WatchlistMovieResponse::addedDate).reversed())
+                .collectList();
 
-                            return WatchlistMovieResponse.builder()
-                                    .id(entity.getId())
-                                    .posterUrl(tmdbMovie.posterPath())
-                                    .title(tmdbMovie.title())
-                                    .overview(tmdbMovie.overview())
-                                    .runtime(tmdbMovie.runtime())
-                                    .movieId(entity.getMovieId())
-                                    .releaseDate(entity.getReleaseDate())
-                                    .voteAverage(tmdbMovie.voteAverage())
-                                    .userId(user.getId())
-                                    .genres(genreNames)
-                                    .productionCountries(countryName)
-                                    .build();
-                        }
-                    } catch (Exception e) {
-                        System.err.println("ОШИБКА TMDB ДЛЯ ФИЛЬМА " + entity.getTitle() + ": " + e.getMessage());
-                    }
-                    return watchlistMovieMapper.mapToWatchlistMovie(entity);
-                })
-                .toList();
-
-        return new PageImpl<>(dataFromTMDB, pageable, dtoPage.getTotalElements());
+        return responseMono.map(list -> new PageImpl<>(list, pageable, entityPage.getTotalElements()));
     }
 
     @Transactional
@@ -120,18 +115,31 @@ public class WatchlistMovieService {
         watchlistMovieRepository.deleteByUserIdAndMovieId(user.getId(), movieId);
     }
 
-    public Page<WatchlistMovieResponse> findMovieInUsersWatchlist(OidcUser oidcUser, String movieName, LanguageType language, Pageable pageable) {
-        UserEntity user = handleUserNotFound(oidcUser.getEmail());
-
-        Page<WatchlistMovieEntity> entityPage = watchlistMovieRepository.
-                findByUserIdAndTitleContainingIgnoreCase(user.getId(), movieName, pageable);
-
-        return entityPage.map(entity -> watchlistMovieMapper.mapToPageableWatchlistMovie(entity, language));
-    }
+    // TODO WatchlistMovieRepository
+//    public Page<WatchlistMovieResponse> findMovieInUsersWatchlist(OidcUser oidcUser, String movieName, LanguageType language, Pageable pageable) {
+//        UserEntity user = handleUserNotFound(oidcUser.getEmail());
+//
+//        Page<WatchlistMovieEntity> entityPage = watchlistMovieRepository.
+//                findByUserIdAndTitleContainingIgnoreCase(user.getId(), movieName, pageable);
+//
+//        return entityPage.map(entity -> watchlistMovieMapper.mapToPageableWatchlistMovie(entity, language));
+//    }
 
     //TODO create custom exception
     private UserEntity handleUserNotFound(String userEmail) {
         return userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+    }
+
+    private List<String> getGenresFromMovieDetails(MovieDetails movieDetails) {
+        return movieDetails.genres() != null
+                ? movieDetails.genres().stream().map(GenreResponse::name).toList()
+                : List.of();
+    }
+
+    private List<String> getCompaniesFromMovieDetails(MovieDetails movieDetails) {
+        return movieDetails.productionCountries() != null
+                ? movieDetails.productionCountries().stream().map(ProductionCountryResponse::name).toList()
+                : List.of();
     }
 }

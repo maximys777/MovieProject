@@ -10,8 +10,9 @@ import org.springframework.stereotype.Repository;
 public interface WatchlistMovieRepository extends JpaRepository<WatchlistMovieEntity, Long> {
     Page<WatchlistMovieEntity> getWatchlistMovieEntityByUserId(Long userId, Pageable pageable);
 
-    Page<WatchlistMovieEntity> findByUserIdAndTitleContainingIgnoreCase(Long userId, String title,
-                                                                        Pageable pageable);
+    // TODO change to another way to get saved movies by title from another user
+//    Page<WatchlistMovieEntity> findByUserIdAndTitleContainingIgnoreCase(Long userId, String title,
+//                                                                        Pageable pageable);
 
     void deleteByUserIdAndMovieId(Long userId, Long movieId);
 

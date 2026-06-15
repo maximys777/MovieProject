@@ -2,7 +2,9 @@ package com.maximys777.project.watchlist.tvshow.dto.response;
 
 import com.maximys777.project.watchlist.tvshow.dto.response.seasons.SeasonResponse;
 import lombok.Builder;
+import net.minidev.json.annotate.JsonIgnore;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Builder
@@ -19,6 +21,8 @@ public record WatchlistTvShowResponse(
         Integer currentSeason,
         Integer currentEpisode,
         Long userId,
-        List<SeasonResponse> seasons
+        List<SeasonResponse> seasons,
+        @JsonIgnore
+        LocalDateTime addedDate
 ) {
 }

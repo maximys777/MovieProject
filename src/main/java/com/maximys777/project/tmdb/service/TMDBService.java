@@ -30,7 +30,7 @@ import java.util.List;
 public class TMDBService {
     private final WebClient tmdbWebClient;
 
-    @Cacheable(value = "movies", key = "{#timeWindow, #page, #language}")
+    @Cacheable(value = "trendMovies", key = "{#timeWindow, #page, #language}")
     public Flux<TrendMovieResponse> getTrendingMovies(TimeWindow timeWindow, int page, LanguageType language) {
         return tmdbWebClient.get()
                 .uri("/trending/movie/{timeWindow}?page={page}&language={language}", timeWindow, page, language)
@@ -52,7 +52,7 @@ public class TMDBService {
                                 new RuntimeException("Service unavailable after" + retryBackoffSpec.maxAttempts + " attempts", retrySignal.failure())));
     }
 
-    @Cacheable(value = "tvShows", key = "{#timeWindow, #page, #language}")
+    @Cacheable(value = "trendTvShows", key = "{#timeWindow, #page, #language}")
     public Flux<TrendTvShowResponse> getTrendingTvShows(TimeWindow timeWindow, int page, LanguageType language) {
         return tmdbWebClient.get()
                 .uri("/trending/tv/{timeWindow}?page={page}&language={language}", timeWindow, page, language)
@@ -88,8 +88,10 @@ public class TMDBService {
                     return new TvShowDetailsResponse(
                             response.id(),
                             response.name(),
+                            response.posterPath(),
                             response.overview(),
                             response.voteAverage(),
+                            response.firstAirDate(),
                             response.numberOfEpisodes(),
                             response.numberOfSeasons(),
                             response.genres(),
@@ -116,6 +118,7 @@ public class TMDBService {
                         .filter(this::isRetryableError));
     }
 
+    @Cacheable(value = "movieGenres", key = "#language")
     public Mono<GenreListResponse> getMovieGenres(LanguageType language) {
         return tmdbWebClient.get()
                 .uri("/genre/movie/list?language={language}", language)
@@ -125,6 +128,7 @@ public class TMDBService {
                         .filter(this::isRetryableError));
     }
 
+    @Cacheable(value = "tvShowGenres", key = "#language")
     public Mono<GenreListResponse> getTvGenres(LanguageType language) {
         return tmdbWebClient.get()
                 .uri("/genre/tv/list?language={language}", language)

@@ -13,8 +13,10 @@ import java.util.List;
 public record TvShowDetailsResponse(
         Long id,
         String name,
+        String posterPath,
         String overview,
         Double voteAverage,
+        String firstAirDate,
         Integer numberOfEpisodes,
         Integer numberOfSeasons,
         List<GenreResponse> genres,
