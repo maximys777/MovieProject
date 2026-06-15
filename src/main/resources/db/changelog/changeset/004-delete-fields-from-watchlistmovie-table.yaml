@@ -1,0 +1,16 @@
+databaseChangeLog:
+  - changeSet:
+      id: delete-fields-from-wathclistmovie-table
+      author: maximys777
+      changes:
+        - dropColumn:
+            tableName: watchlist_movies
+            columns:
+              - column:
+                  name: poster_url
+              - column:
+                  name: title
+              - column:
+                  name: release_date
+              - column:
+                  name: popularity

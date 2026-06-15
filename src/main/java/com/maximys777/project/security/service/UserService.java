@@ -14,18 +14,12 @@ import java.util.Optional;
 public class UserService {
     private final UserRepository userRepository;
 
-    public UserCreatedResponse processOAuthPostLogin(UserLoginRequest userLoginRequest) {
+    public void processOAuthPostLogin(UserLoginRequest userLoginRequest) {
         Optional<UserEntity> user = userRepository.findByEmail(userLoginRequest.email());
 
         UserEntity savedUser;
 
-        if (user.isPresent()) {
-            UserEntity existingUser = user.get();
-
-            existingUser.setGoogleId(userLoginRequest.googleId());
-
-            savedUser = userRepository.save(existingUser);
-        } else {
+        if (user.isEmpty()) {
             UserEntity newUser = UserEntity.builder()
                     .email(userLoginRequest.email())
                     .googleId(userLoginRequest.googleId())
@@ -34,9 +28,11 @@ public class UserService {
                     .build();
 
             savedUser = userRepository.save(newUser);
+        } else {
+            savedUser = user.get();
         }
 
-        return UserCreatedResponse.builder()
+        UserCreatedResponse.builder()
                 .id(savedUser.getId())
                 .email(savedUser.getEmail())
                 .userName(savedUser.getUserName())

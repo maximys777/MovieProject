@@ -1,0 +1,16 @@
+databaseChangeLog:
+  - changeSet:
+      id: delete-fields-from-watchlisttvshows-table
+      author: maximys777
+      changes:
+        - dropColumn:
+            tableName: watchlist_tv_shows
+            columns:
+              - column:
+                  name: name
+              - column:
+                  name: poster_url
+              - column:
+                  name: first_air_date
+              - column:
+                  name: origin_country
