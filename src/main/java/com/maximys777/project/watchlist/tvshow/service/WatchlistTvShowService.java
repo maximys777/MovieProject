@@ -22,7 +22,10 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -66,10 +69,6 @@ public class WatchlistTvShowService {
         } else {
             watchlistTvShowEntity = WatchlistTvShowEntity.builder()
                     .tvShowId(request.tvShowId())
-                    .name(request.name())
-                    .posterUrl(request.posterUrl())
-                    .firstAirDate(request.firstAirDate())
-                    .originCountry(request.originCountry())
                     .currentSeason(request.currentSeason())
                     .currentEpisode(request.currentEpisode())
                     .userId(user.getId())
@@ -80,66 +79,56 @@ public class WatchlistTvShowService {
         return watchlistTvShowMapper.mapToAddedWatchlistTvShow(watchlistTvShowEntity);
     }
 
-    public Page<WatchlistTvShowResponse> findUsersWatchlistTvShow(Long userId, Pageable pageable, LanguageType language) {
+    public Mono<Page<WatchlistTvShowResponse>> findUsersWatchlistTvShow(Long userId, Pageable pageable, LanguageType language) {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new UsernameNotFoundException("User " + userId + " does not exist"));
 
         return getWatchlistTvShowResponses(pageable, language, user);
     }
 
-    public Page<WatchlistTvShowResponse> getAuthenticatedUserWatchlist(OidcUser oidcUser, Pageable pageable, LanguageType language) {
+    public Mono<Page<WatchlistTvShowResponse>> getAuthenticatedUserWatchlist(OidcUser oidcUser, Pageable pageable, LanguageType language) {
         UserEntity user = handleUserNotFound(oidcUser.getEmail());
 
         return getWatchlistTvShowResponses(pageable, language, user);
     }
 
-    private PageImpl<WatchlistTvShowResponse> getWatchlistTvShowResponses(Pageable pageable, LanguageType language, UserEntity user) {
-        Page<WatchlistTvShowEntity> dtoPage = watchlistTvShowRepository.findByUserId(user.getId(), pageable);
+    private Mono<Page<WatchlistTvShowResponse>> getWatchlistTvShowResponses(Pageable pageable,
+                                                                            LanguageType language,
+                                                                            UserEntity user) {
+        Page<WatchlistTvShowEntity> entityPage = watchlistTvShowRepository
+                .findByUserId(user.getId(), pageable);
 
-        List<WatchlistTvShowResponse> translatedTvShows = dtoPage.getContent().stream()
-                .map(entity -> {
-                    try {
-                        TvShowDetailsResponse tmdbShow = tmdbService.getTvShowDetails(entity.getTvShowId(), language).block();
-                        if (tmdbShow != null && tmdbShow.name() != null) {
+        Flux<WatchlistTvShowEntity> entityFlux = Flux.fromIterable(entityPage.getContent());
 
-                            List<SeasonResponse> seasonResponse = tmdbShow.seasons().stream()
-                                    .filter(s -> s.seasonNumber() > 0)
-                                    .map(s -> new SeasonResponse(s.id(), s.name(), s.seasonNumber(), s.episodeCount(), s.airDate()))
-                                    .toList();
+        Mono<List<WatchlistTvShowResponse>> responseMono = entityFlux
+                .flatMap(entity ->
+                        tmdbService.getTvShowDetails(entity.getTvShowId(), language)
+                                .map(response -> {
+                                    List<String> genres = getGenreFromTvShowDetails(response);
+                                    List<String> companies = getCompaniesFromTvShowDetails(response);
 
-                            List<String> genreNames = tmdbShow.genres() != null
-                                    ? tmdbShow.genres().stream().map(GenreResponse::name).toList()
-                                    : List.of();
+                                    return WatchlistTvShowResponse.builder()
+                                            .id(entity.getId())
+                                            .posterUrl(response.posterPath())
+                                            .name(response.name())
+                                            .overview(response.overview())
+                                            .tvShowId(entity.getTvShowId())
+                                            .voteAverage(response.voteAverage())
+                                            .firstAirDate(response.firstAirDate())
+                                            .genres(genres)
+                                            .productionCountries(companies)
+                                            .currentSeason(entity.getCurrentSeason())
+                                            .currentEpisode(entity.getCurrentEpisode())
+                                            .userId(user.getId())
+                                            .seasons(response.seasons())
+                                            .addedDate(entity.getAddedDate())
+                                            .build();
+                                })
+                                .defaultIfEmpty(watchlistTvShowMapper.mapToWatchlistTvShow(entity)))
+                .sort(Comparator.comparing(WatchlistTvShowResponse::addedDate).reversed())
+                .collectList();
 
-                            List<String> countryNames = tmdbShow.productionCountries() != null
-                                    ? tmdbShow.productionCountries().stream().map(ProductionCountriesResponse::name).toList()
-                                    : List.of();
-
-                            return WatchlistTvShowResponse.builder()
-                                    .id(entity.getId())
-                                    .posterUrl(entity.getPosterUrl())
-                                    .name(tmdbShow.name())
-                                    .overview(tmdbShow.overview())
-                                    .tvShowId(entity.getTvShowId())
-                                    .voteAverage(tmdbShow.voteAverage())
-                                    .firstAirDate(entity.getFirstAirDate())
-                                    .genres(genreNames)
-                                    .productionCountries(countryNames)
-                                    .currentSeason(entity.getCurrentSeason())
-                                    .currentEpisode(entity.getCurrentEpisode())
-                                    .userId(user.getId())
-                                    .seasons(seasonResponse)
-                                    .build();
-                        }
-                    } catch (Exception e) {
-                        System.err.println("ОШИБКА TMDB ДЛЯ СЕРИАЛА " + entity.getName() + ": " + e.getMessage());
-                    }
-
-                    return watchlistTvShowMapper.mapToWatchlistTvShowResponse(entity);
-                })
-                .toList();
-
-        return new PageImpl<>(translatedTvShows, pageable, dtoPage.getTotalElements());
+        return responseMono.map(list -> new PageImpl<>(list, pageable, entityPage.getTotalElements()));
     }
 
     @Transactional
@@ -158,5 +147,17 @@ public class WatchlistTvShowService {
     private UserEntity handleUserNotFound(String userEmail) {
         return userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new UsernameNotFoundException("User  not found"));
+    }
+
+    private List<String> getGenreFromTvShowDetails(TvShowDetailsResponse response) {
+        return response.genres() != null
+                ? response.genres().stream().map(GenreResponse::name).toList()
+                : List.of();
+    }
+
+    private List<String> getCompaniesFromTvShowDetails(TvShowDetailsResponse response) {
+        return response.productionCountries() != null
+                ? response.productionCountries().stream().map(ProductionCountriesResponse::name).toList()
+                : List.of();
     }
 }

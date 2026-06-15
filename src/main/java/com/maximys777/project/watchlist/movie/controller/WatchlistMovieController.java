@@ -20,6 +20,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Mono;
+
 
 @RestController
 @RequestMapping("/watchlist-movies")
@@ -35,18 +37,26 @@ public class WatchlistMovieController {
     }
 
     @GetMapping("/{userId}/user")
-    public Page<WatchlistMovieResponse> getWatchlistMovie(@PathVariable Long userId,
-                                                          Pageable pageable,
-                                                          @RequestParam LanguageType language) {
+    public Mono<Page<WatchlistMovieResponse>> getWatchlistMovie(@PathVariable Long userId,
+                                                                Pageable pageable,
+                                                                @RequestParam LanguageType language) {
         return watchlistMovieService.findUsersWatchlistMovie(userId, pageable, language);
     }
 
     @GetMapping("/me")
-    public Page<WatchlistMovieResponse> getMyWatchlistMovie(@AuthenticationPrincipal OidcUser oidcUser,
+    public Mono<Page<WatchlistMovieResponse>> getMyWatchlistMovie(@AuthenticationPrincipal OidcUser oidcUser,
                                                             Pageable pageable,
                                                             @RequestParam LanguageType language) {
         return watchlistMovieService.getAuthenticatedUserWatchlist(oidcUser, pageable, language);
     }
+
+//    @GetMapping("/search/{movieName}")
+//    public Page<WatchlistMovieResponse> findMovieInUsersWatchlist(@PathVariable String movieName,
+//                                                                  @AuthenticationPrincipal OidcUser oidcUser,
+//                                                                  @RequestParam LanguageType language,
+//                                                                  Pageable pageable) {
+//        return watchlistMovieService.findMovieInUsersWatchlist(oidcUser, movieName, language, pageable);
+//    }
 
     @DeleteMapping
     public void deleteMovieFromWatchlist(@AuthenticationPrincipal OidcUser oidcUser,

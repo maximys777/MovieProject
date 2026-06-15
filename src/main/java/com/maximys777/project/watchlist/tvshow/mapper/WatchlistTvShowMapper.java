@@ -9,5 +9,7 @@ import org.mapstruct.Mapper;
 public interface WatchlistTvShowMapper {
     AddedWatchlistTvShowResponse mapToAddedWatchlistTvShow(WatchlistTvShowEntity watchlistTvShowEntity);
 
-    WatchlistTvShowResponse mapToWatchlistTvShowResponse(WatchlistTvShowEntity watchlistTvShowEntity);
+//    WatchlistTvShowResponse mapToWatchlistTvShowResponse(WatchlistTvShowEntity watchlistTvShowEntity, LanguageType language);
+
+    WatchlistTvShowResponse mapToWatchlistTvShow(WatchlistTvShowEntity watchlistTvShowEntity);
 }
