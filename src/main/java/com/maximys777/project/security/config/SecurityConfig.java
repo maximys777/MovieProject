@@ -1,5 +1,7 @@
 package com.maximys777.project.security.config;
 
+import com.maximys777.project.security.handler.CustomAuthenticationFailureHandler;
+import com.maximys777.project.security.handler.CustomAuthenticationSuccessHandler;
 import com.maximys777.project.security.service.CustomOAuth2UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -16,6 +18,8 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     private final CustomOAuth2UserService customOAuth2UserService;
+    private final CustomAuthenticationSuccessHandler customAuthenticationSuccessHandler;
+    private final CustomAuthenticationFailureHandler customAuthenticationFailureHandler;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) {
@@ -26,7 +30,8 @@ public class SecurityConfig {
                                 .oidcUserService(customOAuth2UserService))
                         .redirectionEndpoint(redirect -> redirect
                                 .baseUri("/grantcode"))
-                        .defaultSuccessUrl("/profile.html", true))
+                        .successHandler(customAuthenticationSuccessHandler)
+                        .failureHandler(customAuthenticationFailureHandler))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/watchlist-movies/*/user").permitAll()
