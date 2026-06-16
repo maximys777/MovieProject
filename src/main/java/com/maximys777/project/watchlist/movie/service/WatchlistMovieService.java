@@ -1,5 +1,8 @@
 package com.maximys777.project.watchlist.movie.service;
 
+import com.maximys777.project.exceptions.exceptions.AlreadyExistsException;
+import com.maximys777.project.exceptions.exceptions.MovieNotFoundException;
+import com.maximys777.project.exceptions.exceptions.UsernameNotFoundException;
 import com.maximys777.project.security.entity.UserEntity;
 import com.maximys777.project.security.repository.UserRepository;
 import com.maximys777.project.tmdb.common.LanguageType;
@@ -18,7 +21,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -39,7 +41,7 @@ public class WatchlistMovieService {
         UserEntity user = handleUserNotFound(oidcUser.getEmail());
 
         if (watchlistMovieRepository.existsByMovieIdAndUserId(request.movieId(), user.getId())) {
-            throw new RuntimeException("Movie with id " + request.movieId() + " already exists in your watchlist");
+            throw new AlreadyExistsException("Movie with id " + request.movieId() + " already exists in your watchlist");
         }
 
         WatchlistMovieEntity watchlistMovieEntity = WatchlistMovieEntity.builder()
@@ -109,7 +111,7 @@ public class WatchlistMovieService {
         UserEntity user = handleUserNotFound(oidcUser.getEmail());
 
         if (!watchlistMovieRepository.existsByMovieIdAndUserId(movieId, user.getId())) {
-            throw new IllegalArgumentException("Movie not found in your watchlist");
+            throw new MovieNotFoundException("Movie not found in your watchlist");
         }
 
         watchlistMovieRepository.deleteByUserIdAndMovieId(user.getId(), movieId);
