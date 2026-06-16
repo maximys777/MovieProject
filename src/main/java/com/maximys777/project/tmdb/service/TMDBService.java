@@ -12,6 +12,7 @@ import com.maximys777.project.tmdb.dto.response.tvshow.TrendTvShowResponse;
 import com.maximys777.project.tmdb.dto.response.tvshow.TvShowResultResponse;
 import com.maximys777.project.watchlist.tvshow.dto.response.seasons.SeasonResponse;
 import com.maximys777.project.watchlist.tvshow.dto.response.seasons.TvShowDetailsResponse;
+import com.maximys777.project.exceptions.exceptions.ServiceUnavailable;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
@@ -49,7 +50,7 @@ public class TMDBService {
                                 System.out.println("Retry request. Attempt #" + (retrySignal.totalRetries() + 1))
                         )
                         .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) ->
-                                new RuntimeException("Service unavailable after" + retryBackoffSpec.maxAttempts + " attempts", retrySignal.failure())));
+                                new ServiceUnavailable("Service unavailable after" + retryBackoffSpec.maxAttempts + " attempts", retrySignal.failure())));
     }
 
     @Cacheable(value = "trendTvShows", key = "{#timeWindow, #page, #language}")
@@ -71,7 +72,7 @@ public class TMDBService {
                                 System.out.println("Retry request. Attempt #" + (retrySignal.totalRetries() + 1))
                         )
                         .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) ->
-                                new RuntimeException("Service unavailable after" + retryBackoffSpec.maxAttempts + " attempts", retrySignal.failure())));
+                                new ServiceUnavailable("Service unavailable after" + retryBackoffSpec.maxAttempts + " attempts", retrySignal.failure())));
     }
 
     @Cacheable(value = "tvShowDetails", key = "{#tvShowId, #language}")

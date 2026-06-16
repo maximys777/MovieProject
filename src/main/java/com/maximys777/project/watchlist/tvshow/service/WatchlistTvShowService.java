@@ -1,5 +1,10 @@
 package com.maximys777.project.watchlist.tvshow.service;
 
+import com.maximys777.project.exceptions.exceptions.EpisodeNotExistsException;
+import com.maximys777.project.exceptions.exceptions.SeasonNotExistsException;
+import com.maximys777.project.exceptions.exceptions.TvShowNotExistsException;
+import com.maximys777.project.exceptions.exceptions.TvShowNotFoundException;
+import com.maximys777.project.exceptions.exceptions.UsernameNotFoundException;
 import com.maximys777.project.security.entity.UserEntity;
 import com.maximys777.project.security.repository.UserRepository;
 import com.maximys777.project.tmdb.common.LanguageType;
@@ -18,7 +23,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,16 +49,16 @@ public class WatchlistTvShowService {
         TvShowDetailsResponse detailsResponse = tmdbService.getTvShowDetails(request.tvShowId()).block();
 
         if (detailsResponse == null) {
-            throw new IllegalArgumentException("Tv show " + request.name() + " does not exist");
+            throw new TvShowNotExistsException("Tv show " + request.name() + " does not exist");
         }
 
         SeasonResponse targetSeason = detailsResponse.seasons().stream()
                 .filter(s -> Objects.equals(s.seasonNumber(), request.currentSeason()))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Season " + request.currentSeason() + " does not exist"));
+                .orElseThrow(() -> new SeasonNotExistsException("Season " + request.currentSeason() + " does not exist"));
 
         if (request.currentEpisode() > targetSeason.episodeCount() || request.currentEpisode() < 0) {
-            throw new IllegalArgumentException("In season " + request.currentSeason() + " only " + targetSeason.episodeCount() + " episodes");
+            throw new EpisodeNotExistsException("In season " + request.currentSeason() + " only " + targetSeason.episodeCount() + " episodes");
         }
 
         Optional<WatchlistTvShowEntity> existingShow = watchlistTvShowRepository.findByUserIdAndTvShowId(user.getId(), request.tvShowId());
@@ -136,7 +140,7 @@ public class WatchlistTvShowService {
         UserEntity user = handleUserNotFound(oidcUser.getEmail());
 
         if (!watchlistTvShowRepository.existsByUserIdAndTvShowId(user.getId(), tvShowId)) {
-            throw new IllegalArgumentException("Tv show not found in your watchlist");
+            throw new TvShowNotFoundException("Tv show not found in your watchlist");
         }
 
         watchlistTvShowRepository.deleteByUserIdAndTvShowId(user.getId(), tvShowId);
