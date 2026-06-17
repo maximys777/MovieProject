@@ -38,6 +38,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/watchlist-movies").authenticated()
                         .requestMatchers(HttpMethod.GET, "/watchlist-tv-shows/*/user").permitAll()
                         .requestMatchers("/index.html", "/js/**", "/css/**", "/login.html", "/details/**", "/trending/**", "/search/**", "/search.html").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated())
                 .build();
     }
