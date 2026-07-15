@@ -11,6 +11,7 @@ public record SearchDropdownResponse(
         @JsonProperty("media_type") String mediaType,
         @JsonProperty("title") String title,
         @JsonProperty("poster_url") String posterUrl,
+        @JsonProperty("popularity") Double popularity,
         @JsonProperty("release_year") String releaseYear,
         @JsonProperty("genres") List<String> genres
 ) {
