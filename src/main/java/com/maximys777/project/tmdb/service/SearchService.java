@@ -8,13 +8,16 @@ import com.maximys777.project.tmdb.dto.response.search.MultiSearchResponse;
 import com.maximys777.project.tmdb.dto.response.search.SearchDropdownResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -24,18 +27,19 @@ public class SearchService {
 
     private final TMDBService tmdbService;
 
-    private final Map<String, Map<Integer, String>> genreCache = new ConcurrentHashMap<>();
+    private final Map<LanguageType, Map<Integer, String>> genreCache = new ConcurrentHashMap<>();
 
     public Mono<List<SearchDropdownResponse>> search(String query, LanguageType language) {
         return tmdbService.multiSearch(query, language, 1)
                 .map(tmdbResponse -> tmdbResponse.results().stream()
                         .filter(item -> MediaType.movie.equals(item.mediaType()) ||
                                 MediaType.tv.equals(item.mediaType()))
+                        .sorted(Comparator.comparingDouble((MultiSearchDetailsResponse moviePopularity) ->
+                                        moviePopularity.popularity() == null ? 0.0 : moviePopularity.popularity())
+                                .reversed())
                         .limit(5)
                         .map(item -> {
-                            List<String> genreNames = item.genreIds().stream()
-                                    .map(id -> getGenreName(Math.toIntExact(id), language))
-                                    .toList();
+                            List<String> extractGenreNames = getGenreName(item.genreIds(), language);
 
                             String title = MediaType.movie.equals(item.mediaType()) ? item.title() : item.name();
                             String date = MediaType.movie.equals(item.mediaType()) ? item.releaseDate() : item.firstAirDate();
@@ -47,49 +51,63 @@ public class SearchService {
                                     .title(title)
                                     .posterUrl(item.posterPath())
                                     .releaseYear(year)
-                                    .genres(genreNames)
+                                    .genres(extractGenreNames)
                                     .build();
                         })
                         .toList());
     }
 
     @Scheduled(fixedRate = 86400000)
-    @Cacheable(value = "genres")
     public void refreshGenreCache() {
         log.info("Refreshing genre cache is start");
 
-        for (LanguageType language : LanguageType.values()) {
-            Map<Integer, String> combinedGenres = new ConcurrentHashMap<>();
+        List<Mono<Void>> monos = Arrays.stream(LanguageType.values())
+                .map(language ->
+                        Mono.zip(
+                                        tmdbService.getMovieGenres(language),
+                                        tmdbService.getTvGenres(language)
+                                )
+                                .doOnNext(tuple -> {
+                                    Map<Integer, String> combinedGenres = new ConcurrentHashMap<>();
 
-            try {
-                GenreListResponse movieGenres = tmdbService.getMovieGenres(language).block();
+                                    GenreListResponse movieGenres = tuple.getT1();
+                                    if (movieGenres.genres() != null) {
+                                        movieGenres.genres().forEach(genre ->
+                                                combinedGenres.put(genre.id(), genre.name()));
+                                    }
 
-                if (movieGenres != null && movieGenres.genres() != null) {
-                    movieGenres.genres().forEach(genre -> combinedGenres.put(genre.id(), genre.name()));
-                }
+                                    GenreListResponse tvGenres = tuple.getT2();
+                                    if (tvGenres.genres() != null) {
+                                        tvGenres.genres().forEach(genre ->
+                                                combinedGenres.put(genre.id(), genre.name()));
+                                    }
 
-                GenreListResponse tvGenres = tmdbService.getTvGenres(language).block();
+                                    genreCache.put(language, combinedGenres);
+                                })
+                                .onErrorResume(e -> {
+                                    log.error("Error refreshing genre cache for language {}, {}", language.name(), e.getMessage());
+                                    return Mono.empty();
+                                })
+                                .then()
+                )
+                .toList();
 
-                if (tvGenres != null && tvGenres.genres() != null) {
-                    tvGenres.genres().forEach(genre -> combinedGenres.put(genre.id(), genre.name()));
-                }
-
-                genreCache.put(language.name(), combinedGenres);
-            } catch (Exception e) {
-                log.error("Error refreshing genre cache for language {}, {}", language.name(), e.getMessage());
-            }
-        }
-        log.info("Refreshing genre cache is complete");
+        Mono.when(monos.toArray(new Mono[0]))
+                .doOnSuccess(v -> log.info("Refreshing genre cache is complete"))
+                .doOnError(e -> log.error("Error refreshing genre cache", e))
+                .subscribeOn(Schedulers.boundedElastic())
+                .subscribe();
     }
 
     public Mono<MultiSearchResponse> fullSearch(String query, LanguageType language, int page) {
         return tmdbService.multiSearch(query, language, page)
                 .map(response -> {
                     List<MultiSearchDetailsResponse> results = response.results().stream()
+                            .sorted(Comparator.comparingDouble((MultiSearchDetailsResponse moviePopularity) ->
+                                            moviePopularity.popularity() == null ? 0.0 : moviePopularity.popularity())
+                                    .reversed())
                             .map(item -> {
-                                List<String> genresName = item.genreIds() != null ? item.genreIds().stream()
-                                        .map(id -> getGenreName(Math.toIntExact(id), language))
-                                        .toList() : List.of();
+                                List<String> extractGenreNames = getGenreName(item.genreIds(), language);
 
                                 return MultiSearchDetailsResponse.builder()
                                         .id(item.id())
@@ -98,20 +116,28 @@ public class SearchService {
                                         .posterPath(item.posterPath())
                                         .mediaType(item.mediaType())
                                         .genreIds(item.genreIds())
-                                        .genreNames(genresName)
+                                        .genreNames(extractGenreNames)
                                         .releaseDate(item.releaseDate())
                                         .firstAirDate(item.firstAirDate())
                                         .voteAverage(item.voteAverage())
                                         .name(item.name())
                                         .build();
                             }).toList();
-                    
+
                     return new MultiSearchResponse(response.page(), results, response.totalPages(), response.totalResults());
                 });
     }
 
-    public String getGenreName(Integer genreId, LanguageType language) {
-        Map<Integer, String> langMap = genreCache.getOrDefault(language.name(), genreCache.get("en"));
-        return langMap != null ? langMap.getOrDefault(genreId, "Unknown") : "Unknown";
+    private List<String> getGenreName(List<Long> genreId, LanguageType language) {
+        if (genreId == null || genreId.isEmpty()) {
+            return List.of();
+        }
+
+        return genreId.stream()
+                .map(id -> Optional.ofNullable(genreCache.get(language))
+                        .or(() -> Optional.ofNullable(genreCache.get(LanguageType.en)))
+                        .map(langMap -> langMap.get(Math.toIntExact(id)))
+                        .orElse("Unknown"))
+                .toList();
     }
 }

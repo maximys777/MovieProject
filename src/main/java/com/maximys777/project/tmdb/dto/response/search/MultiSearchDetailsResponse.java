@@ -15,6 +15,7 @@ public record MultiSearchDetailsResponse(
         @JsonProperty("media_type") MediaType mediaType,
         @JsonProperty("genre_ids") List<Long> genreIds,
         @JsonProperty("genre_names") List<String> genreNames,
+        @JsonProperty("popularity") Double popularity,
         @JsonProperty("release_date") String releaseDate,
         @JsonProperty("first_air_date") String firstAirDate,
         @JsonProperty("vote_average") Double voteAverage,
