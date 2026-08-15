@@ -24,7 +24,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import reactor.core.publisher.Mono;
 
 
 @Tag(name = "Watchlist Movies", description = "Endpoints for managing movie watchlist")
@@ -60,7 +59,7 @@ public class WatchlistMovieController {
             @ApiResponse(responseCode = "503", description = "Service unavailable (TMDB service down)")
     })
     @GetMapping("/{userId}/user")
-    public Mono<Page<WatchlistMovieResponse>> getWatchlistMovie(@PathVariable Long userId,
+    public Page<WatchlistMovieResponse> getWatchlistMovie(@PathVariable Long userId,
                                                                 Pageable pageable,
                                                                 @RequestParam LanguageType language) {
         return watchlistMovieService.findUsersWatchlistMovie(userId, pageable, language);
@@ -75,7 +74,7 @@ public class WatchlistMovieController {
             @ApiResponse(responseCode = "503", description = "Service unavailable (TMDB service down)")
     })
     @GetMapping("/me")
-    public Mono<Page<WatchlistMovieResponse>> getMyWatchlistMovie(@AuthenticationPrincipal OidcUser oidcUser,
+    public Page<WatchlistMovieResponse> getMyWatchlistMovie(@AuthenticationPrincipal OidcUser oidcUser,
                                                                   Pageable pageable,
                                                                   @RequestParam LanguageType language) {
         return watchlistMovieService.getAuthenticatedUserWatchlist(oidcUser, pageable, language);

@@ -1,5 +1,6 @@
 package com.maximys777.project.watchlist.tvshow.mapper;
 
+import com.maximys777.project.tmdb.common.LanguageType;
 import com.maximys777.project.watchlist.tvshow.dto.response.AddedWatchlistTvShowResponse;
 import com.maximys777.project.watchlist.tvshow.dto.response.WatchlistTvShowResponse;
 import com.maximys777.project.watchlist.tvshow.entity.WatchlistTvShowEntity;
@@ -9,7 +10,5 @@ import org.mapstruct.Mapper;
 public interface WatchlistTvShowMapper {
     AddedWatchlistTvShowResponse mapToAddedWatchlistTvShow(WatchlistTvShowEntity watchlistTvShowEntity);
 
-//    WatchlistTvShowResponse mapToWatchlistTvShowResponse(WatchlistTvShowEntity watchlistTvShowEntity, LanguageType language);
-
-    WatchlistTvShowResponse mapToWatchlistTvShow(WatchlistTvShowEntity watchlistTvShowEntity);
+    WatchlistTvShowResponse mapToWatchlistTvShowResponse(WatchlistTvShowEntity watchlistTvShowEntity, LanguageType language);
 }
