@@ -1,39 +1,40 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>КиноТренды</title>
+    <title data-i18n="page-title-home">MovieTracker</title>
     <link rel="stylesheet" href="/css/style.css">
     <script src="/js/translations.js"></script>
+    <script src="/js/i18n.js"></script>
 </head>
 <body>
 
 <nav class="navbar">
-    <a href="/" class="navbar-logo">Кино<span>Тренды</span></a>
+    <a href="/" class="navbar-logo">Movie<span>Tracker</span></a>
 
     <div class="nav-links">
-        <a href="index.html" style="color: var(--primary-color); font-weight: bold;" data-i18n="nav-home">Главная</a>
+        <a href="index.html" style="color: var(--primary-color); font-weight: bold;" data-i18n="nav-home">Home</a>
 
         <div class="search-container">
-            <input type="text" id="search-input" class="search-input" data-i18n="search-placeholder" placeholder="Поиск..." autocomplete="off">
+            <input type="text" id="search-input" class="search-input" data-i18n="search-placeholder" placeholder="Search movies and TV shows..." autocomplete="off">
             <div id="search-spinner" class="search-spinner hidden"></div>
 
             <div id="search-dropdown" class="search-dropdown hidden">
                 <div id="search-results"></div>
-                <button id="btn-view-all-search" class="btn-view-all-search hidden" onclick="goToSearchPage()" data-i18n="btn-all-results">
-                    Смотреть все результаты
+                <button id="btn-view-all-search" class="btn-view-all-search hidden" data-action="search-all" data-i18n="btn-all-results">
+                    View all results
                 </button>
             </div>
         </div>
 
-        <select id="langSelect" class="lang-select" onchange="changeLanguage(this.value)">
+        <select id="langSelect" class="lang-select">
             <option value="en">EN</option>
             <option value="ru">RU</option>
             <option value="uk">UK</option>
         </select>
         <a href="profile.html" class="profile-link">
-            <img src="https://ui-avatars.com/api/?name=User&background=e50914&color=fff" alt="Аватар" class="avatar">
+            <img src="https://ui-avatars.com/api/?name=User&background=e50914&color=fff" alt="Avatar" data-i18n="alt-avatar" data-i18n-attr="alt" class="avatar">
         </a>
     </div>
 </nav>
@@ -41,28 +42,28 @@
 <div class="content-wrapper">
     <div class="trending-section">
         <div class="section-header">
-            <h2 data-i18n="trending-title">Тренды</h2>
+            <h2 data-i18n="trending-title">Trending</h2>
             <div class="controls">
                 <div class="media-toggle">
-                    <button id="type-movies" onclick="updateMediaType('movies')" class="active" data-i18n="type-movies">Фильмы</button>
-                    <button id="type-tv" onclick="updateMediaType('tv-shows')" data-i18n="type-tv">Сериалы</button>
+                    <button id="type-movies" class="active" data-action="set-media-type" data-media-type="movies" data-i18n="type-movies">Movies</button>
+                    <button id="type-tv" data-action="set-media-type" data-media-type="tv-shows" data-i18n="type-tv">TV Shows</button>
                 </div>
 
-                <button id="btn-day" onclick="updateTimeWindow('day', 'btn-day')" class="active" data-i18n="btn-today">Сегодня</button>
-                <button id="btn-week" onclick="updateTimeWindow('week', 'btn-week')" data-i18n="btn-week">За неделю</button>
+                <button id="btn-day" class="active" data-action="set-time-window" data-time-window="day" data-i18n="btn-today">Today</button>
+                <button id="btn-week" data-action="set-time-window" data-time-window="week" data-i18n="btn-week">This week</button>
             </div>
         </div>
-        <button id="prevBtn" class="slider-nav prev-slide" onclick="scrollSlider(-450)">&#10094;</button>
+        <button id="prevBtn" class="slider-nav prev-slide" data-action="scroll-slider" data-slider="trending-slider" data-distance="-450">&#10094;</button>
         <div class="slider-container" id="trending-slider"></div>
-        <button id="nextBtn" class="slider-nav next-slide" onclick="scrollSlider(450)">&#10095;</button>
+        <button id="nextBtn" class="slider-nav next-slide" data-action="scroll-slider" data-slider="trending-slider" data-distance="450">&#10095;</button>
     </div>
 
     <div class="section-header">
-        <h2 id="catalog-title" data-i18n="catalog-movies">Каталог фильмов</h2>
+        <h2 id="catalog-title" data-i18n="catalog-movies">Movie Catalog</h2>
     </div>
 
     <div id="movies-grid"></div>
-    <div id="load-status" class="loading-status" data-i18n="loading">Подождите, загрузка...</div>
+    <div id="load-status" class="loading-status" data-i18n="loading">Loading...</div>
 </div>
 
 <div id="movie-modal" class="modal-overlay">
@@ -70,7 +71,7 @@
         <div class="modal-body">
             <div class="modal-header-info">
                 <div style="position: relative; flex-shrink: 0;">
-                    <img id="movie-modal-poster" src="" alt="Постер">
+                    <img id="movie-modal-poster" src="" alt="Poster" data-i18n="alt-poster" data-i18n-attr="alt">
                     <div id="movie-modal-rating" class="modal-rating-badge">★ 0.0</div>
                 </div>
                 <div class="modal-details">
@@ -85,18 +86,18 @@
             </div>
 
             <div class="modal-movie-overview">
-                <h3 style="margin-bottom: 10px; font-size: 18px; color: white;" data-i18n="modal-about">Про фильм</h3>
+                <h3 style="margin-bottom: 10px; font-size: 18px; color: white;" data-i18n="modal-about">About movie</h3>
                 <div class="overview-wrapper">
                     <p id="movie-modal-overview" class="modal-overview-text collapsed">...</p>
                     <button id="movie-read-more" class="btn-read-more" data-i18n="modal-read-more"
-                            onclick="toggleOverview('movie-modal-overview', this)">Читать далее
+                            data-action="toggle-overview" data-target="movie-modal-overview">Read more
                     </button>
                 </div>
             </div>
         </div>
         <div class="modal-footer">
-            <button class="btn-cancel" onclick="closeMovieModal()" data-i18n="modal-cancel">Отмена</button>
-            <button class="btn-save" onclick="saveMovieToWatchlist()" data-i18n="modal-save">Добавить в список</button>
+            <button class="btn-cancel" data-action="close-movie-modal" data-i18n="modal-cancel">Cancel</button>
+            <button class="btn-save" data-action="save-movie" data-i18n="modal-save">Add to watchlist</button>
         </div>
     </div>
 </div>
@@ -105,7 +106,7 @@
     <div class="modal-content">
         <div class="modal-body">
             <div class="modal-header-info">
-                <img id="modal-poster" src="" alt="Постер">
+                <img id="modal-poster" src="" alt="Poster" data-i18n="alt-poster" data-i18n-attr="alt">
                 <div class="modal-details">
                     <h2 id="modal-title">...</h2>
                     <div class="modal-tags">
@@ -120,10 +121,10 @@
 
             <div class="modal-progress-section">
                 <div class="progress-header">
-                    <h3 data-i18n="modal-episodes">Отметить просмотренное</h3>
+                    <h3 data-i18n="modal-episodes">Mark watched</h3>
                     <label class="checkbox-label">
-                        <input type="checkbox" id="check-all-season" onchange="toggleAllEpisodes(this)">
-                        <span data-i18n="modal-all-season">Выбрать весь сезон</span>
+                        <input type="checkbox" id="check-all-season" data-action="toggle-all-episodes">
+                        <span data-i18n="modal-all-season">Select all season</span>
                     </label>
                 </div>
                 <div id="season-tabs" class="season-tabs"></div>
@@ -131,8 +132,8 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button class="btn-cancel" onclick="closeModal()" data-i18n="modal-cancel">Отмена</button>
-            <button class="btn-save" onclick="saveTvShowProgress()" data-i18n="modal-save">Сохранить</button>
+            <button class="btn-cancel" data-action="close-modal" data-target="tv-modal" data-i18n="modal-cancel">Cancel</button>
+            <button class="btn-save" data-action="save-tv" data-i18n="modal-save">Add to watchlist</button>
         </div>
     </div>
 </div>

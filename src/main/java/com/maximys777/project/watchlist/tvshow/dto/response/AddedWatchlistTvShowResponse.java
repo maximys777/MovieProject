@@ -7,6 +7,8 @@ public record AddedWatchlistTvShowResponse(
         Long id,
         String name,
         Long tvShowId,
-        Long userId
+        Long userId,
+        Integer currentSeason,
+        Integer currentEpisode
 ) {
 }

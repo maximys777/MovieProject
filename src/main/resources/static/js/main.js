@@ -1,9 +1,9 @@
 // --- ГЛОБАЛЬНЫЕ НАСТРОЙКИ ---
+// Язык (currentLang, t, tf, changeLanguage) живет в i18n.js, он подключается раньше main.js
 const API_BASE_URL = '';
 const IMG_500 = 'https://image.tmdb.org/t/p/w500';
-
-// 1. ЗАПОМИНАЕМ ВЫБОР ЯЗЫКА НАВСЕГДА
-let currentLang = localStorage.getItem('app_language') || 'en';
+const POSTER_FALLBACK = 'https://placehold.co/500x750/333333/ffffff?text=No+Image';
+const POSTER_FALLBACK_SMALL = 'https://placehold.co/50x75/333333/ffffff?text=No+Image';
 
 let currentTimeWindow = 'day';
 let currentMediaType = 'movies';
@@ -12,7 +12,12 @@ let totalPages = 1;
 let isLoading = false;
 
 let currentSelectedMovie = null;
-let currentMovieBtnElement = null;
+
+// Данные карточек храним в JS, а не в HTML-атрибутах:
+// раньше объект сериализовался прямо в onclick="..." и любой апостроф в названии
+// ломал разметку с ошибкой "missing ) after argument list"
+let trendingItems = [];
+let catalogItems = [];
 
 // --- УВЕДОМЛЕНИЯ ---
 function showToast(message, isError = false) {
@@ -26,19 +31,40 @@ function showToast(message, isError = false) {
     setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
+// --- КАРТИНКИ ---
+// data-fallback="hide" прячет карточку, любое другое значение — это URL заглушки
+function bindImageFallbacks(root) {
+    if (!root) return;
+    root.querySelectorAll('img[data-fallback]').forEach(img => {
+        img.addEventListener('error', () => {
+            const mode = img.dataset.fallback;
+            if (mode === 'hide') {
+                const card = img.closest('.slider-item') || img.parentElement;
+                if (card) card.style.display = 'none';
+            } else if (img.src !== mode) {
+                img.src = mode;
+            }
+        }, {once: true});
+    });
+}
+
 // --- НАВИГАЦИЯ И КАТАЛОГ ---
 function updateMediaType(type) {
     currentMediaType = type;
-    document.getElementById('type-movies').classList.toggle('active', type === 'movies');
-    document.getElementById('type-tv').classList.toggle('active', type === 'tv-shows');
+    const btnMovies = document.getElementById('type-movies');
+    const btnTv = document.getElementById('type-tv');
+    if (btnMovies) btnMovies.classList.toggle('active', type === 'movies');
+    if (btnTv) btnTv.classList.toggle('active', type === 'tv-shows');
+
     const titleEl = document.getElementById('catalog-title');
-    if (titleEl) titleEl.innerText = type === 'movies' ? 'Каталог фильмов' : 'Каталог сериалов';
+    if (titleEl) titleEl.innerText = type === 'movies' ? t('catalog-movies') : t('catalog-tv');
+
     loadTrending();
     resetCatalog();
 }
 
-function updateTimeWindow(window, btnId) {
-    currentTimeWindow = window;
+function updateTimeWindow(timeWindow, btnId) {
+    currentTimeWindow = timeWindow;
     const btnDay = document.getElementById('btn-day');
     const btnWeek = document.getElementById('btn-week');
     if (btnDay) btnDay.classList.remove('active');
@@ -49,41 +75,18 @@ function updateTimeWindow(window, btnId) {
     resetCatalog();
 }
 
-// УМНАЯ СМЕНА ЯЗЫКА
-function changeLanguage(lang) {
-    currentLang = lang;
-    localStorage.setItem('app_language', lang); // Сохраняем в память
-
-    applyTranslations();
-
-    // Синхронизируем все селекторы на странице
-    document.querySelectorAll('.lang-select').forEach(s => s.value = lang);
-
-    if (document.getElementById('trending-slider')) {
-        // Мы на главной
-        loadTrending();
-        resetCatalog();
-    } else if (document.getElementById('search-load-status')) {
-        // Мы на странице поиска
-        const urlParams = new URLSearchParams(window.location.search);
-        const query = urlParams.get('query');
-        if (query && typeof loadFullSearchResults === 'function') {
-            loadFullSearchResults(query);
-        }
-    }
-}
-
 function resetCatalog() {
     const grid = document.getElementById('movies-grid');
     if (!grid) return;
     currentPage = 1;
+    catalogItems = [];
     grid.innerHTML = '';
     loadCatalog();
 }
 
-function scrollSlider(dist) {
-    const slider = document.getElementById('trending-slider');
-    if (slider) slider.scrollBy({left: dist, behavior: 'smooth'});
+function scrollSlider(sliderId, distance) {
+    const slider = document.getElementById(sliderId);
+    if (slider) slider.scrollBy({left: distance, behavior: 'smooth'});
 }
 
 function updateNavButtons() {
@@ -97,14 +100,14 @@ function updateNavButtons() {
 }
 
 function getDisplayTitle(item) {
-    return item.title || item.name || 'Без названия';
+    return item.title || item.name || t('no-title');
 }
 
 // --- ЗАГРУЗКА ДАННЫХ ---
 async function loadTrending() {
     const slider = document.getElementById('trending-slider');
     if (!slider) return;
-    slider.innerHTML = '<p style="padding: 20px;">Загрузка...</p>';
+    slider.innerHTML = `<p style="padding: 20px;">${t('loading')}</p>`;
     try {
         const url = `${API_BASE_URL}/trending/${currentMediaType}/${currentTimeWindow}?page=1&language=${currentLang}`;
         const res = await fetch(url);
@@ -113,21 +116,19 @@ async function loadTrending() {
 
         if (!responseData || !responseData.results) return;
 
-        let items = responseData.results.filter(m => m.poster_path).slice(0, 10);
+        trendingItems = responseData.results.filter(m => m.poster_path).slice(0, 10);
 
-        slider.innerHTML = items.map(item => {
-            const encodedItem = encodeURIComponent(JSON.stringify(item)).replace(/'/g, "%27");
-            return `
-            <div class="slider-item" onclick="handleFavoriteClick(this, '${encodedItem}')">
+        slider.innerHTML = trendingItems.map((item, index) => `
+            <div class="slider-item" data-trending-index="${index}">
                 <div class="image-container">
                     <span class="rating-badge">★ ${item.vote_average ? item.vote_average.toFixed(1) : '0.0'}</span>
-                    <img src="${IMG_500}${item.poster_path}" alt="${getDisplayTitle(item)}" onerror="this.parentElement.parentElement.style.display='none'">
+                    <img src="${IMG_500}${item.poster_path}" alt="${getDisplayTitle(item)}" data-fallback="hide">
                 </div>
                 <div class="movie-title">${getDisplayTitle(item)}</div>
             </div>
-            `;
-        }).join('');
+        `).join('');
 
+        bindImageFallbacks(slider);
         setTimeout(updateNavButtons, 300);
         slider.scrollLeft = 0;
     } catch (e) {
@@ -142,7 +143,7 @@ async function loadCatalog() {
 
     if (isLoading) return;
     isLoading = true;
-    statusEl.innerText = 'Загрузка контента...';
+    statusEl.innerText = t('loading');
 
     try {
         const url = `${API_BASE_URL}/trending/${currentMediaType}/${currentTimeWindow}?page=${currentPage}&language=${currentLang}`;
@@ -151,23 +152,17 @@ async function loadCatalog() {
         const responseData = Array.isArray(data) ? data[0] : data;
 
         if (!responseData || !responseData.results) {
-            statusEl.innerText = 'Сталася помилка при завантаженні';
+            statusEl.innerText = t('toast-error');
             return;
         }
 
         totalPages = responseData.total_pages;
-        const items = responseData.results.filter(m => m.poster_path);
+        appendItems(responseData.results.filter(m => m.poster_path));
 
-        appendItems(items);
-
-        if (currentPage >= totalPages) {
-            statusEl.innerText = 'Больше ничего нет';
-        } else {
-            statusEl.innerText = '';
-        }
+        statusEl.innerText = currentPage >= totalPages ? t('no-more-results') : '';
     } catch (e) {
         console.error(e);
-        statusEl.innerText = 'Ошибка сети';
+        statusEl.innerText = t('toast-error');
     } finally {
         isLoading = false;
     }
@@ -176,59 +171,63 @@ async function loadCatalog() {
 function appendItems(items) {
     const grid = document.getElementById('movies-grid');
     if (!grid) return;
+    const detailsLabel = t('more-details');
+
     const html = items.map(item => {
-        const encodedItem = encodeURIComponent(JSON.stringify(item));
+        const index = catalogItems.push(item) - 1;
         return `
-        <div class="movie-card">
+        <div class="movie-card" data-item-index="${index}">
             <div style="position:relative">
-                <img src="${IMG_500}${item.poster_path || item.posterPath}" alt="${getDisplayTitle(item)}" onerror="this.src='https://placehold.co/500x750/333333/ffffff?text=No+Image'">
+                <img src="${IMG_500}${item.poster_path || item.posterPath}" alt="${getDisplayTitle(item)}" data-fallback="${POSTER_FALLBACK}">
                 <span class="rating-badge">★ ${item.vote_average ? item.vote_average.toFixed(1) : '0.0'}</span>
             </div>
             <div class="movie-card-body">
                 <div class="movie-title" title="${getDisplayTitle(item)}">${getDisplayTitle(item)}</div>
-                <button style="width:100%; padding:8px; background:var(--primary-color); border:none; color:white; border-radius:4px; cursor:pointer;"
-                        onclick="handleFavoriteClick(this, '${encodedItem}')">
-                    Детально
+                <button class="btn-detail-card" style="width:100%; padding:8px; background:var(--primary-color); border:none; color:white; border-radius:4px; cursor:pointer;">
+                    ${detailsLabel}
                 </button>
             </div>
         </div>
-    `
+    `;
     }).join('');
+
     grid.insertAdjacentHTML('beforeend', html);
+    bindImageFallbacks(grid);
 }
 
-function handleFavoriteClick(btnElement, encodedItemStr) {
-    const item = JSON.parse(decodeURIComponent(encodedItemStr));
+function handleItemClick(item) {
+    if (!item) return;
     const type = item.media_type || item.mediaType || (currentMediaType === 'tv-shows' ? 'tv' : 'movie');
 
     if (type === 'tv' || type === 'tv-shows') {
         openTvModal(item);
     } else {
-        openMovieModal(item, btnElement);
+        openMovieModal(item);
     }
 }
 
 // --- МОДАЛКА ФИЛЬМОВ ---
-async function openMovieModal(movie, btnElement) {
+async function openMovieModal(movie) {
     currentSelectedMovie = movie;
-    currentMovieBtnElement = btnElement;
-    const t = translations[currentLang];
 
     const modalEl = document.getElementById('movie-modal');
     if (!modalEl) {
-        console.error("Модалка фильма не найдена!");
+        console.error('Модалка фильма не найдена!');
         return;
     }
 
     document.getElementById('movie-modal-title').innerText = getDisplayTitle(movie);
-    document.getElementById('movie-modal-poster').src = movie.poster_path ? `${IMG_500}${movie.poster_path}` : 'https://placehold.co/500x750/333333/ffffff?text=No+Image';
+    document.getElementById('movie-modal-poster').src = movie.poster_path ? `${IMG_500}${movie.poster_path}` : POSTER_FALLBACK;
 
     const date = movie.release_date || movie.releaseDate;
-    document.getElementById('movie-modal-year').innerText = `${t['year-label']}: ${date ? date.substring(0, 4) : '...'}`;
+    document.getElementById('movie-modal-year').innerText = `${t('year-label')}: ${date ? date.substring(0, 4) : '...'}`;
     document.getElementById('movie-modal-rating').innerText = `★ ${movie.vote_average ? movie.vote_average.toFixed(1) : 'NR'}`;
 
     const countryEl = document.getElementById('movie-modal-country');
-    if (countryEl) countryEl.innerText = `${t['country-label']}: ${t['loading']}`;
+    if (countryEl) countryEl.innerText = `${t('country-label')}: ${t('loading')}`;
+
+    // Сбрасываем описание сразу, чтобы не показывать текст предыдущего фильма, пока грузятся детали
+    setupOverview('movie-modal-overview', 'movie-read-more', movie.overview);
 
     // Добавляем и active (для главной) и show (для профиля)
     modalEl.classList.add('active', 'show');
@@ -239,54 +238,56 @@ async function openMovieModal(movie, btnElement) {
         const details = await res.json();
 
         const originalId = currentSelectedMovie.id;
-        currentSelectedMovie = { ...currentSelectedMovie, ...details };
+        currentSelectedMovie = {...currentSelectedMovie, ...details};
         currentSelectedMovie.id = originalId || details.id;
 
-        if (countryEl) countryEl.innerText = `${t['country-label']}: ${formatList(details.production_countries || details.productionCountries)}`;
+        if (countryEl) countryEl.innerText = `${t('country-label')}: ${formatList(details.production_countries || details.productionCountries)}`;
 
         const runtimeEl = document.getElementById('movie-modal-runtime');
-        if (runtimeEl) runtimeEl.innerText = `${details.runtime || '...'} ${t['runtime-label']}`;
+        if (runtimeEl) runtimeEl.innerText = `${details.runtime || '...'} ${t('runtime-label')}`;
 
         const genresCont = document.getElementById('movie-modal-genres');
         if (genresCont) genresCont.innerHTML = formatGenres(details.genres);
 
-        // --- ВОТ ИСПРАВЛЕНИЕ ДЛЯ ОЦЕНКИ ---
-        // Берем точную оценку из полных деталей и обновляем бейдж!
+        // Берем точную оценку из полных деталей и обновляем бейдж
         const finalRating = details.vote_average || details.voteAverage;
         const ratingEl = document.getElementById('movie-modal-rating');
         if (ratingEl) {
             ratingEl.innerText = `★ ${(finalRating && finalRating > 0) ? finalRating.toFixed(1) : 'NR'}`;
         }
 
-        if (details.overview) setupOverview('movie-modal-overview', 'movie-read-more', details.overview);
-    } catch (e) { console.error(e); }
+        setupOverview('movie-modal-overview', 'movie-read-more', details.overview);
+    } catch (e) {
+        console.error(e);
+    }
 }
 
 function closeMovieModal() {
-    document.getElementById('movie-modal').classList.remove('active');
-    document.body.classList.remove('modal-open');
+    closeModal('movie-modal');
 }
 
 // СОХРАНЕНИЕ ФИЛЬМА
 async function saveMovieToWatchlist() {
     if (!currentSelectedMovie || !currentSelectedMovie.id) {
-        showToast("Ошибка: ID фильма не найден", true);
+        showToast(t('toast-movie-id-error'), true);
         return;
     }
 
     const btnSave = document.querySelector('#movie-modal .btn-save');
-    const originalText = btnSave.innerText;
-    btnSave.innerText = '⏳...';
-    btnSave.style.pointerEvents = 'none';
+    const originalText = btnSave ? btnSave.innerText : '';
+    if (btnSave) {
+        btnSave.innerText = '⏳...';
+        btnSave.style.pointerEvents = 'none';
+    }
 
     const item = currentSelectedMovie;
     const releaseDate = item.release_date || item.releaseDate;
     let formattedDate = null;
     if (releaseDate && releaseDate.length >= 10) {
-        formattedDate = releaseDate.substring(0, 10) + "T00:00:00";
+        formattedDate = releaseDate.substring(0, 10) + 'T00:00:00';
     }
 
-    // ИСПРАВЛЕНИЕ: Шлем ID в двух форматах, чтобы Spring Boot 100% его съел
+    // Шлем ID в двух форматах, чтобы Spring Boot 100% его съел
     const payload = {
         poster_path: item.poster_path || item.posterPath,
         title: getDisplayTitle(item),
@@ -303,26 +304,24 @@ async function saveMovieToWatchlist() {
             body: JSON.stringify(payload)
         });
 
-        if (response.status === 401 || response.status === 403) {
+        if (response.status === 401 || response.status === 403 || response.redirected || response.url.includes('/login.html')) {
             window.location.href = '/login.html';
             return;
         }
 
         if (response.ok) {
-            showToast(translations[currentLang]['toast-success']);
+            showToast(t('toast-success'));
             closeMovieModal();
-            if (currentMovieBtnElement) {
-                currentMovieBtnElement.innerText = '✅';
-                currentMovieBtnElement.style.background = '#28a745';
-            }
         } else {
-            showToast(translations[currentLang]['toast-error'], true);
+            showToast(t('toast-error'), true);
         }
     } catch (e) {
-        showToast("Error", true);
+        showToast(t('toast-error'), true);
     } finally {
-        btnSave.innerText = originalText;
-        btnSave.style.pointerEvents = 'auto';
+        if (btnSave) {
+            btnSave.innerText = originalText;
+            btnSave.style.pointerEvents = 'auto';
+        }
     }
 }
 
@@ -332,15 +331,13 @@ let currentShowSeasons = [];
 let currentSelectedSeason = 1;
 let currentSelectedEpisode = 0;
 
-// --- МОДАЛКА СЕРИАЛОВ ---
 async function openTvModal(show) {
     currentShowData = show;
-    const t = translations[currentLang];
 
     // УМНЫЙ ПОИСК: Ищем tv-modal (на главной) ИЛИ progress-modal (в профиле)
     const modalEl = document.getElementById('tv-modal') || document.getElementById('progress-modal');
     if (!modalEl) {
-        console.error("Модальное окно сериала не найдено на этой странице!");
+        console.error('Модальное окно сериала не найдено на этой странице!');
         return;
     }
 
@@ -348,17 +345,17 @@ async function openTvModal(show) {
     if (titleEl) titleEl.innerText = getDisplayTitle(show);
 
     const posterEl = document.getElementById('modal-poster');
-    if (posterEl) posterEl.src = show.poster_path ? `${IMG_500}${show.poster_path}` : 'https://placehold.co/500x750/333333/ffffff?text=No+Image';
+    if (posterEl) posterEl.src = show.poster_path ? `${IMG_500}${show.poster_path}` : POSTER_FALLBACK;
 
     const date = show.first_air_date || show.firstAirDate;
     const yearEl = document.getElementById('modal-year');
-    if (yearEl) yearEl.innerText = `${t['year-label']}: ${date ? date.substring(0, 4) : '...'}`;
+    if (yearEl) yearEl.innerText = `${t('year-label')}: ${date ? date.substring(0, 4) : '...'}`;
 
     const countryEl = document.getElementById('modal-country');
-    if (countryEl) countryEl.innerText = `${t['country-label']}: ${t['loading']}`;
+    if (countryEl) countryEl.innerText = `${t('country-label')}: ${t('loading')}`;
 
     const overviewEl = document.getElementById('modal-overview');
-    if (overviewEl) overviewEl.innerText = show.overview || t['no-results'];
+    if (overviewEl) overviewEl.innerText = show.overview || t('no-description');
 
     // Добавляем и active (для главной) и show (для профиля)
     modalEl.classList.add('active', 'show');
@@ -370,13 +367,13 @@ async function openTvModal(show) {
 
         // 1. ЗАЩИТА ID: сохраняем TMDB ID, чтобы null с бэкенда его не убил
         const originalId = currentShowData.id;
-        currentShowData = { ...currentShowData, ...details };
+        currentShowData = {...currentShowData, ...details};
         currentShowData.id = originalId || details.id;
 
-        // 2. ОБНОВЛЕНИЕ СТРАНЫ (исправили баг)
+        // 2. ОБНОВЛЕНИЕ СТРАНЫ
         if (countryEl) {
             const countries = details.production_countries || details.productionCountries || [];
-            countryEl.innerText = `${t['country-label']}: ${formatList(countries)}`;
+            countryEl.innerText = `${t('country-label')}: ${formatList(countries)}`;
         }
 
         // 3. ОБНОВЛЕНИЕ ОЦЕНКИ
@@ -387,49 +384,53 @@ async function openTvModal(show) {
         }
 
         const seasonsCountEl = document.getElementById('modal-seasons-count');
-        if (seasonsCountEl) seasonsCountEl.innerText = `${t['seasons-label']}: ${details.number_of_seasons || '...'}`;
+        if (seasonsCountEl) seasonsCountEl.innerText = `${t('seasons-label')}: ${details.number_of_seasons || '...'}`;
 
         const genresCont = document.getElementById('tv-modal-genres') || document.getElementById('modal-genres');
         if (genresCont) genresCont.innerHTML = formatGenres(details.genres);
 
-        if (details.overview) setupOverview('modal-overview', 'tv-read-more', details.overview);
+        setupOverview('modal-overview', 'tv-read-more', details.overview);
 
         currentShowSeasons = details.seasons || [];
-        if (typeof renderSeasonTabs === 'function') renderSeasonTabs();
-        if (currentShowSeasons.length > 0 && typeof loadEpisodes === 'function') loadEpisodes(0);
-    } catch (e) { console.error(e); }
+        renderSeasonTabs();
+        if (currentShowSeasons.length > 0) loadEpisodes(0);
+    } catch (e) {
+        console.error(e);
+    }
 }
 
 function renderSeasonTabs() {
     const tabsContainer = document.getElementById('season-tabs');
     if (!tabsContainer) return;
+    const seasonLabel = t('season-label');
     tabsContainer.innerHTML = currentShowSeasons.map((s, index) => `
-        <button class="season-tab ${index === 0 ? 'active' : ''}"
-                onclick="loadEpisodes(${index}, this)">
-            Сезон ${s.season_number || s.seasonNumber}
+        <button class="season-tab ${index === 0 ? 'active' : ''}" data-season-index="${index}">
+            ${seasonLabel} ${s.season_number || s.seasonNumber}
         </button>
     `).join('');
 }
 
 function loadEpisodes(seasonIndex, tabElement = null) {
     const seasonObj = currentShowSeasons[seasonIndex];
+    if (!seasonObj) return;
     currentSelectedSeason = seasonObj.season_number || seasonObj.seasonNumber;
     currentSelectedEpisode = 0;
     const checkAll = document.getElementById('check-all-season');
     if (checkAll) checkAll.checked = false;
 
     if (tabElement) {
-        document.querySelectorAll('.season-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.season-tab').forEach(tab => tab.classList.remove('active'));
         tabElement.classList.add('active');
     }
 
     const grid = document.getElementById('episodes-grid');
+    if (!grid) return;
     const epCount = seasonObj.episode_count || seasonObj.episodeCount;
 
     if (epCount && epCount > 0) {
         let html = '';
         for (let i = 1; i <= epCount; i++) {
-            html += `<button class="episode-btn" id="ep-btn-${i}" onclick="selectEpisode(${i})">${i}</button>`;
+            html += `<button class="episode-btn" id="ep-btn-${i}" data-episode="${i}">${i}</button>`;
         }
         grid.innerHTML = html;
     }
@@ -451,22 +452,19 @@ function toggleAllEpisodes(checkbox) {
     selectEpisode(checkbox.checked ? btns.length : 0);
 }
 
-function closeModal() {
-    // Снимаем классы сразу со всех возможных модалок, чтобы наверняка
-    const modals = ['tv-modal', 'movie-modal', 'progress-modal', 'full-grid-modal'];
-    modals.forEach(m => {
-        const el = document.getElementById(m);
-        if (el) {
-            el.classList.remove('active', 'show');
-        }
+// modalId не задан — закрываем все модалки, какие есть на странице
+function closeModal(modalId) {
+    const ids = modalId ? [modalId] : ['tv-modal', 'movie-modal', 'progress-modal', 'full-grid-modal'];
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('active', 'show');
     });
-    document.body.classList.remove('modal-open');
-    if (typeof checkBodyScroll === 'function') checkBodyScroll();
+    checkBodyScroll();
 }
 
 async function saveTvShowProgress() {
     if (currentSelectedEpisode === 0) {
-        showToast("Оберіть хоча б одну серію!", true);
+        showToast(t('toast-select-episode'), true);
         return;
     }
 
@@ -479,7 +477,7 @@ async function saveTvShowProgress() {
     }
 
     // Достаем страну (из новых данных TMDB)
-    let originCountry = "US";
+    let originCountry = 'US';
     if (currentShowData.production_countries && currentShowData.production_countries.length > 0) {
         originCountry = currentShowData.production_countries[0].name || currentShowData.production_countries[0].iso_3166_1;
     } else if (currentShowData.origin_country && currentShowData.origin_country.length > 0) {
@@ -505,19 +503,19 @@ async function saveTvShowProgress() {
             body: JSON.stringify(payload)
         });
 
-        if (res.status === 401 || res.status === 403) {
+        if (res.status === 401 || res.status === 403 || res.redirected || res.url.includes('/login.html')) {
             window.location.href = '/login.html';
             return;
         }
 
         if (res.ok) {
             closeModal();
-            showToast(translations[currentLang]['toast-success']);
+            showToast(t('toast-success'));
         } else {
-            showToast(translations[currentLang]['toast-error'], true);
+            showToast(t('toast-error'), true);
         }
     } catch (e) {
-        showToast("Error", true);
+        showToast(t('toast-error'), true);
     } finally {
         if (btn) {
             btn.innerText = oldText;
@@ -526,9 +524,58 @@ async function saveTvShowProgress() {
     }
 }
 
+// --- ОБРАБОТЧИКИ КНОПОК ---
+// Один делегированный слушатель вместо inline onclick="..." в HTML
+function handleAction(action, el) {
+    switch (action) {
+        case 'search-all':
+            goToSearchPage();
+            break;
+        case 'set-media-type':
+            updateMediaType(el.dataset.mediaType);
+            break;
+        case 'set-time-window':
+            updateTimeWindow(el.dataset.timeWindow, el.id);
+            break;
+        case 'scroll-slider':
+            scrollSlider(el.dataset.slider, Number(el.dataset.distance));
+            break;
+        case 'toggle-overview':
+            toggleOverview(el.dataset.target, el);
+            break;
+        case 'close-movie-modal':
+            closeMovieModal();
+            break;
+        case 'save-movie':
+            saveMovieToWatchlist();
+            break;
+        case 'save-tv':
+            saveTvShowProgress();
+            break;
+        case 'close-modal':
+            closeModal(el.dataset.target);
+            break;
+        case 'open-full-grid':
+            // Определена только на странице профиля
+            if (typeof openFullGrid === 'function') openFullGrid(el.dataset.gridType);
+            break;
+        default:
+            break;
+    }
+}
+
+document.addEventListener('click', e => {
+    const el = e.target.closest('[data-action]');
+    if (el) handleAction(el.dataset.action, el);
+});
+
+document.addEventListener('change', e => {
+    if (e.target.dataset.action === 'toggle-all-episodes') toggleAllEpisodes(e.target);
+});
+
 // --- ГЛОБАЛЬНЫЕ СЛУШАТЕЛИ ---
-window.addEventListener('click', (e) => {
-    if (e.target.classList.contains('modal-overlay')) closeModal();
+window.addEventListener('click', e => {
+    if (e.target.classList.contains('modal-overlay')) closeModal(e.target.id);
 });
 
 window.addEventListener('scroll', () => {
@@ -542,15 +589,47 @@ window.addEventListener('scroll', () => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Синхронизация языка при загрузке
-    const langSelect = document.getElementById('langSelect');
-    if (langSelect) langSelect.value = currentLang;
-
     const slider = document.getElementById('trending-slider');
     if (slider) {
         slider.addEventListener('scroll', updateNavButtons);
+        slider.addEventListener('click', e => {
+            const card = e.target.closest('[data-trending-index]');
+            if (card) handleItemClick(trendingItems[Number(card.dataset.trendingIndex)]);
+        });
+
+        // Перезагружаем данные при смене языка (главная страница)
+        window.onLanguageChanged = () => {
+            loadTrending();
+            resetCatalog();
+        };
+
         loadTrending();
         loadCatalog();
+    }
+
+    // Каталог с бесконечным скроллом есть только на главной (#load-status)
+    const grid = document.getElementById('movies-grid');
+    if (grid && document.getElementById('load-status')) {
+        grid.addEventListener('click', e => {
+            const card = e.target.closest('[data-item-index]');
+            if (card) handleItemClick(catalogItems[Number(card.dataset.itemIndex)]);
+        });
+    }
+
+    const seasonTabs = document.getElementById('season-tabs');
+    if (seasonTabs) {
+        seasonTabs.addEventListener('click', e => {
+            const tab = e.target.closest('[data-season-index]');
+            if (tab) loadEpisodes(Number(tab.dataset.seasonIndex), tab);
+        });
+    }
+
+    const episodesGrid = document.getElementById('episodes-grid');
+    if (episodesGrid) {
+        episodesGrid.addEventListener('click', e => {
+            const btn = e.target.closest('[data-episode]');
+            if (btn) selectEpisode(Number(btn.dataset.episode));
+        });
     }
 });
 
@@ -570,16 +649,18 @@ function toggleOverview(textId, btn) {
     const isCollapsed = el.classList.contains('collapsed');
     el.classList.toggle('collapsed', !isCollapsed);
     el.classList.toggle('expanded', isCollapsed);
-    btn.innerText = isCollapsed ? 'Згорнути' : 'Читати далі';
+    btn.innerText = isCollapsed ? t('read-less') : t('modal-read-more');
 }
 
 function setupOverview(textId, btnId, text) {
     const el = document.getElementById(textId);
-    const btn = document.getElementById(btnId);
-    if (!el || !btn) return;
-    el.innerText = text || 'Опис відсутній.';
+    if (!el) return;
+    el.innerText = text || t('no-description');
     el.className = 'modal-overview-text collapsed';
-    btn.innerText = 'Читати далі';
+
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.innerText = t('modal-read-more');
     btn.style.display = 'none';
     setTimeout(() => {
         if (el.scrollHeight > el.clientHeight) btn.style.display = 'inline-block';
@@ -596,7 +677,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let timeout = null;
     if (input) {
-        input.addEventListener('input', (e) => {
+        input.addEventListener('input', e => {
             const q = e.target.value.trim();
             clearTimeout(timeout);
             if (q.length < 2) {
@@ -623,36 +704,37 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!results || !dropdown || !btnAll) return;
         results.innerHTML = '';
         if (!items || items.length === 0) {
-            results.innerHTML = '<div class="search-no-results">Нічого не знайдено</div>';
+            results.innerHTML = `<div class="search-no-results">${t('no-results')}</div>`;
             btnAll.classList.add('hidden');
         } else {
             items.forEach(item => {
                 const type = item.media_type || item.mediaType;
                 const poster = item.poster_url || item.posterUrl;
                 const year = item.release_year || item.releaseYear;
-                const title = item.title || item.name || 'Без назви';
-                const img = poster ? `https://image.tmdb.org/t/p/w92${poster}` : 'https://placehold.co/50x75/333333/ffffff?text=No+Image';
+                const title = item.title || item.name || t('no-title');
+                const img = poster ? `https://image.tmdb.org/t/p/w92${poster}` : POSTER_FALLBACK_SMALL;
 
                 const div = document.createElement('div');
                 div.className = 'search-item';
-                div.onclick = () => {
+                div.addEventListener('click', () => {
                     dropdown.classList.add('hidden');
                     const comp = {
                         id: item.id, title, name: title,
                         poster_path: poster ? poster.replace('https://image.tmdb.org/t/p/w92', '') : null,
                         release_date: year ? `${year}-01-01` : null,
                         first_air_date: year ? `${year}-01-01` : null,
-                        vote_average: 0, overview: 'Завантаження...'
+                        vote_average: 0, overview: t('loading')
                     };
-                    type === 'movie' ? openMovieModal(comp, div) : openTvModal(comp);
-                };
+                    type === 'movie' ? openMovieModal(comp) : openTvModal(comp);
+                });
                 div.innerHTML = `
-                    <img src="${img}" alt="${title}" class="search-item-img" onerror="this.src='https://placehold.co/50x75/333333/ffffff?text=No+Image'">
+                    <img src="${img}" alt="${title}" class="search-item-img" data-fallback="${POSTER_FALLBACK_SMALL}">
                     <div class="search-item-info">
                         <div class="search-item-title">${title}</div>
-                        <div class="search-item-meta">${type === 'movie' ? 'Фільм' : 'Серіал'} • ${year || 'N/A'}</div>
+                        <div class="search-item-meta">${type === 'movie' ? t('film') : t('tv-show')} • ${year || 'N/A'}</div>
                         <div class="search-item-genres">${(item.genres || []).join(', ')}</div>
                     </div>`;
+                bindImageFallbacks(div);
                 results.appendChild(div);
             });
             btnAll.classList.remove('hidden');
@@ -665,22 +747,6 @@ document.addEventListener('DOMContentLoaded', () => {
 function goToSearchPage() {
     const btn = document.getElementById('btn-view-all-search');
     if (btn && btn.dataset.query) window.location.href = `/search.html?query=${encodeURIComponent(btn.dataset.query)}`;
-}
-
-function applyTranslations() {
-    const lang = currentLang;
-    const dictionary = translations[lang];
-
-    document.querySelectorAll('[data-i18n]').forEach(el => {
-        const key = el.getAttribute('data-i18n');
-        if (dictionary[key]) {
-            if (el.tagName === 'INPUT') {
-                el.placeholder = dictionary[key];
-            } else {
-                el.innerText = dictionary[key];
-            }
-        }
-    });
 }
 
 function checkBodyScroll() {

@@ -1,11 +1,12 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title data-i18n="login-title">Вхід - КиноТренды</title>
+    <title data-i18n="page-title-login">Login - MovieTracker</title>
     <link rel="stylesheet" href="/css/style.css">
     <script src="/js/translations.js"></script>
+    <script src="/js/i18n.js"></script>
     <style>
         :root { --bg-color: #0b0b0d; --card-bg: #16161a; --text-color: #f1f1f1; --primary-color: #e50914; }
         body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-color); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-image: radial-gradient(circle at top, #1e1e24 0%, var(--bg-color) 70%); }
@@ -23,14 +24,14 @@
 
 <div class="login-container">
     <div class="login-lang">
-        <select id="langSelect" class="lang-select" onchange="changeLanguage(this.value)">
+        <select id="langSelect" class="lang-select">
             <option value="en">EN</option>
             <option value="ru">RU</option>
             <option value="uk">UK</option>
         </select>
     </div>
-    <h1>Кино<span>Тренды</span></h1>
-    <p data-i18n="login-desc">Увійдіть, щоб зберігати улюблені фільми та відстежувати прогрес серіалів</p>
+    <h1>Movie<span>Tracker</span></h1>
+    <p data-i18n="login-desc">Login to save your favorite movies and track TV show progress</p>
 
     <a href="/oauth2/authorization/google" class="google-btn">
         <svg class="google-icon" viewBox="0 0 48 48">
@@ -39,10 +40,9 @@
             <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
             <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
         </svg>
-        <span data-i18n="login-google">Увійти через Google</span>
+        <span data-i18n="login-google">Sign in with Google</span>
     </a>
 </div>
 
-<script src="/js/main.js"></script>
 </body>
 </html>
