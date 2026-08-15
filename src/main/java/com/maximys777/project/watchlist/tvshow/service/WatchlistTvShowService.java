@@ -26,13 +26,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @RequiredArgsConstructor
@@ -83,56 +81,64 @@ public class WatchlistTvShowService {
         return watchlistTvShowMapper.mapToAddedWatchlistTvShow(watchlistTvShowEntity);
     }
 
-    public Mono<Page<WatchlistTvShowResponse>> findUsersWatchlistTvShow(Long userId, Pageable pageable, LanguageType language) {
+    public Page<WatchlistTvShowResponse> findUsersWatchlistTvShow(Long userId, Pageable pageable, LanguageType language) {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new UsernameNotFoundException("User " + userId + " does not exist"));
 
         return getWatchlistTvShowResponses(pageable, language, user);
     }
 
-    public Mono<Page<WatchlistTvShowResponse>> getAuthenticatedUserWatchlist(OidcUser oidcUser, Pageable pageable, LanguageType language) {
+    public Page<WatchlistTvShowResponse> getAuthenticatedUserWatchlist(OidcUser oidcUser, Pageable pageable, LanguageType language) {
         UserEntity user = handleUserNotFound(oidcUser.getEmail());
 
         return getWatchlistTvShowResponses(pageable, language, user);
     }
 
-    private Mono<Page<WatchlistTvShowResponse>> getWatchlistTvShowResponses(Pageable pageable,
-                                                                            LanguageType language,
-                                                                            UserEntity user) {
+    private Page<WatchlistTvShowResponse> getWatchlistTvShowResponses(Pageable pageable,
+                                                                      LanguageType language,
+                                                                      UserEntity user) {
         Page<WatchlistTvShowEntity> entityPage = watchlistTvShowRepository
                 .findByUserId(user.getId(), pageable);
 
-        Flux<WatchlistTvShowEntity> entityFlux = Flux.fromIterable(entityPage.getContent());
+        List<CompletableFuture<WatchlistTvShowResponse>> entityToResponse = entityPage.getContent().stream()
+                .map(entity -> CompletableFuture.supplyAsync(() -> {
+                    try {
+                        TvShowDetailsResponse tvShowDetails = tmdbService.getTvShowDetails(entity.getId()).block();
 
-        Mono<List<WatchlistTvShowResponse>> responseMono = entityFlux
-                .flatMap(entity ->
-                        tmdbService.getTvShowDetails(entity.getTvShowId(), language)
-                                .map(response -> {
-                                    List<String> genres = getGenreFromTvShowDetails(response);
-                                    List<String> companies = getCompaniesFromTvShowDetails(response);
+                        if (tvShowDetails != null) {
+                            List<String> genres = getGenreFromTvShowDetails(tvShowDetails);
+                            List<String> companies = getCompaniesFromTvShowDetails(tvShowDetails);
 
-                                    return WatchlistTvShowResponse.builder()
-                                            .id(entity.getId())
-                                            .posterUrl(response.posterPath())
-                                            .name(response.name())
-                                            .overview(response.overview())
-                                            .tvShowId(entity.getTvShowId())
-                                            .voteAverage(response.voteAverage())
-                                            .firstAirDate(response.firstAirDate())
-                                            .genres(genres)
-                                            .productionCountries(companies)
-                                            .currentSeason(entity.getCurrentSeason())
-                                            .currentEpisode(entity.getCurrentEpisode())
-                                            .userId(user.getId())
-                                            .seasons(response.seasons())
-                                            .addedDate(entity.getAddedDate())
-                                            .build();
-                                })
-                                .defaultIfEmpty(watchlistTvShowMapper.mapToWatchlistTvShow(entity)))
-                .sort(Comparator.comparing(WatchlistTvShowResponse::addedDate).reversed())
-                .collectList();
+                            return WatchlistTvShowResponse.builder()
+                                    .id(entity.getId())
+                                    .posterUrl(tvShowDetails.posterPath())
+                                    .name(tvShowDetails.name())
+                                    .overview(tvShowDetails.overview())
+                                    .tvShowId(entity.getTvShowId())
+                                    .voteAverage(tvShowDetails.voteAverage())
+                                    .firstAirDate(tvShowDetails.firstAirDate())
+                                    .genres(genres)
+                                    .productionCountries(companies)
+                                    .currentSeason(entity.getCurrentSeason())
+                                    .currentEpisode(entity.getCurrentEpisode())
+                                    .userId(user.getId())
+                                    .seasons(tvShowDetails.seasons())
+                                    .addedDate(entity.getAddedDate())
+                                    .build();
+                        } else {
+                            return watchlistTvShowMapper.mapToWatchlistTvShowResponse(entity, language);
+                        }
+                    } catch (Exception e) {
+                        System.out.println(e.getMessage());
+                        return watchlistTvShowMapper.mapToWatchlistTvShowResponse(entity, language);
+                    }
+                })).toList();
 
-        return responseMono.map(list -> new PageImpl<>(list, pageable, entityPage.getTotalElements()));
+        List<WatchlistTvShowResponse> response = entityToResponse.stream()
+                .map(CompletableFuture::join)
+                .toList();
+
+        return new PageImpl<>(response, pageable, entityPage.getTotalElements());
     }
 
     @Transactional
@@ -147,7 +153,6 @@ public class WatchlistTvShowService {
     }
 
 
-    //TODO create custom exception
     private UserEntity handleUserNotFound(String userEmail) {
         return userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new UsernameNotFoundException("User  not found"));
