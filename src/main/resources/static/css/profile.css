@@ -211,3 +211,11 @@ body.modal-open {
 #progress-modal {
     z-index: 2050 !important;
 }
+
+/* Поиск по картотеке (раньше стили и onfocus/onblur жили прямо в profile.html) */
+#grid-search-input {
+    width: 100%; border-radius: 8px; border: 1px solid var(--card-border);
+    background: rgba(0, 0, 0, 0.5); padding: 14px 20px; color: white;
+    font-size: 16px; outline: none; transition: border-color 0.2s;
+}
+#grid-search-input:focus { border-color: var(--primary-color); }

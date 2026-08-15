@@ -1,4 +1,5 @@
-// ВАЖНО: Константы API_BASE_URL и IMG_500 берутся из main.js
+// ВАЖНО: константы API_BASE_URL / IMG_500 / POSTER_FALLBACK и общие функции берутся из main.js,
+// язык (currentLang, t, tf) — из i18n.js
 let loadedMovies = {};
 let loadedTvShows = {};
 let activeModalData = null;
@@ -25,7 +26,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // РЕЖИМ ГОСТЯ
         isMyProfile = false;
         currentProfileUserId = urlUserId;
-        document.getElementById('profile-name').innerText = 'Профіль користувача';
+
+        // Меняем ключ перевода, чтобы заголовок оставался корректным и после смены языка
+        const nameEl = document.getElementById('profile-name');
+        if (nameEl) {
+            nameEl.setAttribute('data-i18n', 'profile-title-guest');
+            nameEl.innerText = t('profile-title-guest');
+        }
         document.querySelectorAll('.btn-delete-action').forEach(btn => btn.style.display = 'none');
 
         // Скрываем поиск в чужом профиле, так как бэкенд ищет только по OidcUser (владельцу сессии)
@@ -38,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 2. СЛУШАТЕЛЬ ДЛЯ ЖИВОГО ПОИСКА В КАРТОТЕКЕ
     if (gridSearchInput) {
-        gridSearchInput.addEventListener('input', (e) => {
+        gridSearchInput.addEventListener('input', e => {
             currentGridQuery = e.target.value.trim();
             clearTimeout(gridSearchTimeout);
 
@@ -51,23 +58,23 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // 3. КЛИКИ ПО КАРТОЧКАМ (вместо inline onclick в разметке карточки)
+    ['movies-slider', 'tv-shows-slider', 'full-grid-content'].forEach(containerId => {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.addEventListener('click', e => {
+            const card = e.target.closest('[data-profile-id]');
+            if (!card) return;
+            openItemModal(Number(card.dataset.profileId), card.dataset.profileMovie === 'true');
+        });
+    });
+
+    // Перезагружаем данные при смене языка
+    window.onLanguageChanged = loadDashboard;
+
     // Сразу грузим дашборд
     loadDashboard();
 });
-
-// Переопределяем функцию смены языка специально для профиля
-function changeLanguage(lang) {
-    currentLang = lang;
-    localStorage.setItem('app_language', lang);
-    if (typeof applyTranslations === 'function') applyTranslations();
-    loadDashboard();
-}
-
-function closeModal(modalId) {
-    const el = document.getElementById(modalId);
-    if (el) el.classList.remove('show');
-    if (typeof checkBodyScroll === 'function') checkBodyScroll();
-}
 
 // =======================
 // 1. ЗАГРУЗКА ДАШБОРДА (КАРУСЕЛИ)
@@ -83,6 +90,25 @@ async function loadDashboard() {
 
     fetchAndRender(movieUrl, 'movies-slider', true);
     fetchAndRender(tvUrl, 'tv-shows-slider', false);
+}
+
+function buildCardHtml(item, id, title, isMovie, detailBtnText) {
+    const badge = !isMovie
+        ? `<div style="position:absolute; top:8px; left:8px; background:var(--primary-color); color:white; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:bold;">S${item.currentSeason} E${item.currentEpisode}</div>`
+        : '';
+
+    return `
+        <div class="movie-card" data-profile-id="${id}" data-profile-movie="${isMovie}">
+            <div style="position:relative">
+                <img src="${IMG_500}${item.posterUrl || item.posterPath || ''}" alt="${title}" data-fallback="${POSTER_FALLBACK}">
+                ${badge}
+            </div>
+            <div class="movie-card-body">
+                <div class="movie-title" title="${title}">${title}</div>
+                <button class="btn-detail-card">${detailBtnText}</button>
+            </div>
+        </div>
+    `;
 }
 
 async function fetchAndRender(url, containerId, isMovie) {
@@ -103,33 +129,24 @@ async function fetchAndRender(url, containerId, isMovie) {
         container.innerHTML = '';
 
         if (items.length === 0) {
-            container.innerHTML = `<div class="empty-state" style="width:100%"><h3 data-i18n="no-results">${translations[currentLang]['no-results']}</h3></div>`;
+            container.innerHTML = `<div class="empty-state" style="width:100%"><h3>${t('no-results')}</h3></div>`;
             return;
         }
 
-        const detailBtnText = translations[currentLang]['more-details'];
+        const detailBtnText = t('more-details');
 
         items.forEach(item => {
             const id = isMovie ? item.movieId : item.tvShowId;
             const title = isMovie ? item.title : item.name;
             if (isMovie) loadedMovies[id] = item; else loadedTvShows[id] = item;
 
-            const badge = !isMovie ? `<div style="position:absolute; top:8px; left:8px; background:var(--primary-color); color:white; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:bold;">S${item.currentSeason} E${item.currentEpisode}</div>` : '';
-
-            container.insertAdjacentHTML('beforeend', `
-                <div class="movie-card" onclick="openItemModal(${id}, ${isMovie})">
-                    <div style="position:relative">
-                        <img src="${IMG_500}${item.posterUrl || item.posterPath || ''}" onerror="this.src='https://placehold.co/500x750/333333/ffffff?text=No+Image'">
-                        ${badge}
-                    </div>
-                    <div class="movie-card-body">
-                        <div class="movie-title" title="${title}">${title}</div>
-                        <button class="btn-detail-card">${detailBtnText}</button>
-                    </div>
-                </div>
-            `);
+            container.insertAdjacentHTML('beforeend', buildCardHtml(item, id, title, isMovie, detailBtnText));
         });
-    } catch (e) { console.error(e); }
+
+        bindImageFallbacks(container);
+    } catch (e) {
+        console.error(e);
+    }
 }
 
 // =======================
@@ -139,14 +156,13 @@ function openItemModal(id, isMovie) {
     const data = isMovie ? loadedMovies[id] : loadedTvShows[id];
     if (!data) return;
     activeModalData = {...data, isMovie};
-    const t = translations[currentLang];
 
     if (isMovie) {
         document.getElementById('movie-modal-title').innerText = data.title;
         document.getElementById('movie-modal-poster').src = data.posterUrl ? `${IMG_500}${data.posterUrl}` : '';
-        document.getElementById('movie-modal-year').innerText = `${t['year-label']}: ${data.releaseDate ? data.releaseDate.substring(0, 4) : '...'}`;
-        document.getElementById('movie-modal-country').innerText = `${t['country-label']}: ${formatList(data.productionCountries)}`;
-        document.getElementById('movie-modal-runtime').innerText = `${data.runtime || '...'} ${t['runtime-label']}`;
+        document.getElementById('movie-modal-year').innerText = `${t('year-label')}: ${data.releaseDate ? data.releaseDate.substring(0, 4) : '...'}`;
+        document.getElementById('movie-modal-country').innerText = `${t('country-label')}: ${formatList(data.productionCountries)}`;
+        document.getElementById('movie-modal-runtime').innerText = `${data.runtime || '...'} ${t('runtime-label')}`;
         document.getElementById('movie-modal-genres').innerHTML = formatGenres(data.genres);
         document.getElementById('movie-modal-rating').innerHTML = `★ ${data.voteAverage ? data.voteAverage.toFixed(1) : 'NR'}`;
 
@@ -163,16 +179,15 @@ function openItemModal(id, isMovie) {
     } else {
         document.getElementById('modal-title').innerText = data.name;
         document.getElementById('modal-poster').src = data.posterUrl ? `${IMG_500}${data.posterUrl}` : '';
-        document.getElementById('modal-year').innerText = `${t['year-label']}: ${data.firstAirDate ? data.firstAirDate.substring(0, 4) : '...'}`;
+        document.getElementById('modal-year').innerText = `${t('year-label')}: ${data.firstAirDate ? data.firstAirDate.substring(0, 4) : '...'}`;
 
         const countries = data.productionCountries || data.originCountry || [];
-        document.getElementById('modal-country').innerText = `${t['country-label']}: ${formatList(Array.isArray(countries) ? countries : [countries])}`;
+        document.getElementById('modal-country').innerText = `${t('country-label')}: ${formatList(Array.isArray(countries) ? countries : [countries])}`;
         document.getElementById('modal-genres').innerHTML = formatGenres(data.genres);
         document.getElementById('modal-rating').innerHTML = `★ ${data.voteAverage ? data.voteAverage.toFixed(1) : 'NR'}`;
 
-        const seasonWord = currentLang === 'en' ? 'Season' : (currentLang === 'uk' ? 'Сезон' : 'Сезон');
-        const episodeWord = currentLang === 'en' ? 'Episode' : (currentLang === 'uk' ? 'Серія' : 'Серия');
-        document.getElementById('modal-status-text').innerText = `${seasonWord} ${data.currentSeason}, ${episodeWord} ${data.currentEpisode}`;
+        document.getElementById('modal-status-text').innerText =
+            `${t('season-label')} ${data.currentSeason}, ${t('episode-label')} ${data.currentEpisode}`;
 
         setupOverview('modal-overview', 'tv-read-more', data.overview);
         renderProgressSeasons(data);
@@ -193,7 +208,6 @@ function renderProgressSeasons(data) {
     if (!tabsContainer) return;
     tabsContainer.innerHTML = '';
     const seasonsList = data.seasons || [];
-    const seasonWord = currentLang === 'en' ? 'Season' : 'Сезон';
 
     seasonsList.forEach(seasonObj => {
         const sNum = seasonObj.season_number ?? seasonObj.seasonNumber;
@@ -201,7 +215,7 @@ function renderProgressSeasons(data) {
 
         const btn = document.createElement('button');
         btn.className = 'season-tab';
-        btn.innerText = `${seasonWord} ${sNum}`;
+        btn.innerText = `${t('season-label')} ${sNum}`;
 
         const isFullyWatched = sNum < data.currentSeason || (sNum === data.currentSeason && data.currentEpisode >= totalEps);
         if (isFullyWatched) btn.classList.add('watched');
@@ -210,11 +224,11 @@ function renderProgressSeasons(data) {
             renderProgressEpisodes(sNum, data);
         }
 
-        btn.onclick = () => {
-            document.querySelectorAll('.season-tab').forEach(t => t.classList.remove('active'));
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.season-tab').forEach(tab => tab.classList.remove('active'));
             btn.classList.add('active');
             renderProgressEpisodes(sNum, data);
-        };
+        });
         tabsContainer.appendChild(btn);
     });
 }
@@ -225,10 +239,7 @@ function renderProgressEpisodes(sNum, data) {
     if (!grid) return;
     grid.innerHTML = '';
 
-    const episodeWord = currentLang === 'en' ? 'Episodes of' : (currentLang === 'uk' ? 'Епізоди' : 'Эпизоды');
-    const seasonWord = currentLang === 'en' ? 'season' : (currentLang === 'uk' ? 'сезону' : 'сезона');
-
-    if (titleEl) titleEl.innerText = `${episodeWord} ${sNum} ${seasonWord}`;
+    if (titleEl) titleEl.innerText = tf('episodes-of-season', {n: sNum});
 
     const seasonData = (data.seasons || []).find(s => (s.season_number ?? s.seasonNumber) === sNum);
     const totalEps = seasonData ? (seasonData.episode_count ?? seasonData.episodeCount ?? 10) : 10;
@@ -249,15 +260,14 @@ function renderProgressEpisodes(sNum, data) {
 // =======================
 async function deleteItem(id, isMovie) {
     if (!isMyProfile) return;
-    const confirmMsg = currentLang === 'en' ? "Are you sure?" : (currentLang === 'uk' ? "Ви впевнені?" : "Вы уверены?");
-    if (!confirm(confirmMsg)) return;
+    if (!confirm(t('confirm-delete'))) return;
 
     const endpoint = isMovie ? `/watchlist-movies?movieId=${id}` : `/watchlist-tv-shows?tvShowId=${id}`;
 
     try {
         const response = await fetch(API_BASE_URL + endpoint, {method: 'DELETE'});
         if (response.ok) {
-            showToast(translations[currentLang]['toast-success']);
+            showToast(t('toast-success'));
             closeModal(isMovie ? 'movie-modal' : 'progress-modal');
             loadDashboard();
 
@@ -267,9 +277,11 @@ async function deleteItem(id, isMovie) {
                 loadGridPage();
             }
         } else {
-            showToast(translations[currentLang]['toast-error'], true);
+            showToast(t('toast-error'), true);
         }
-    } catch (e) { showToast("Error", true); }
+    } catch (e) {
+        showToast(t('toast-error'), true);
+    }
 }
 
 // =======================
@@ -286,10 +298,7 @@ function openFullGrid(type) {
     const content = document.getElementById('full-grid-content');
     const title = document.getElementById('full-grid-title');
     if (content) content.innerHTML = '';
-
-    if (title) {
-        title.innerText = type === 'movies' ? translations[currentLang]['all-saved-title'] : translations[currentLang]['all-saved-title'];
-    }
+    if (title) title.innerText = t('all-saved-title');
 
     document.getElementById('full-grid-modal').classList.add('show');
     document.body.classList.add('modal-open');
@@ -300,7 +309,7 @@ async function loadGridPage() {
     if (isGridLoading) return;
     isGridLoading = true;
     const status = document.getElementById('grid-load-status');
-    if (status) status.innerText = translations[currentLang]['loading'];
+    if (status) status.innerText = t('loading');
 
     const isMovie = gridType === 'movies';
     const basePath = isMovie ? `/watchlist-movies` : `/watchlist-tv-shows`;
@@ -308,8 +317,7 @@ async function loadGridPage() {
 
     // ЛОГИКА ФОРМИРОВАНИЯ URL
     if (currentGridQuery.length > 0) {
-        // РАБОТАЕТ ПОИСК
-        // Стучимся на твой новый эндпоинт поиска (без userId, бэкенд берет из сессии)
+        // РАБОТАЕТ ПОИСК (без userId, бэкенд берет пользователя из сессии)
         endpoint = `${basePath}/search/${encodeURIComponent(currentGridQuery)}?page=${gridPage}&size=20&language=${currentLang}`;
     } else {
         // ПРОСТО ЛИСТАЕМ КАРТОТЕКУ
@@ -320,44 +328,34 @@ async function loadGridPage() {
 
     try {
         const response = await fetch(`${API_BASE_URL}${endpoint}`);
-        if (!response.ok) throw new Error("Server error");
+        if (!response.ok) throw new Error('Server error');
 
         const data = await response.json();
         const items = data.content || [];
         gridTotalPages = data.page?.totalPages || data.totalPages || 1;
 
         const container = document.getElementById('full-grid-content');
-        const detailBtnText = translations[currentLang]['more-details'];
+        const detailBtnText = t('more-details');
 
         if (items.length === 0 && gridPage === 0) {
-            container.innerHTML = `<h3 style="color: white; text-align: center; width: 100%; grid-column: 1 / -1;">${translations[currentLang]['no-results']}</h3>`;
+            container.innerHTML = `<h3 style="color: white; text-align: center; width: 100%; grid-column: 1 / -1;">${t('no-results')}</h3>`;
         }
 
         items.forEach(item => {
             const id = isMovie ? item.movieId : item.tvShowId;
             const title = isMovie ? item.title : item.name;
-            const badge = !isMovie ? `<div style="position:absolute; top:8px; left:8px; background:var(--primary-color); color:white; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:bold;">S${item.currentSeason} E${item.currentEpisode}</div>` : '';
 
             // Сохраняем в кэш
             if (isMovie) loadedMovies[id] = item; else loadedTvShows[id] = item;
 
-            container.insertAdjacentHTML('beforeend', `
-                <div class="movie-card" onclick="openItemModal(${id}, ${isMovie})">
-                    <div style="position:relative">
-                        <img src="${IMG_500}${item.posterUrl || item.posterPath || ''}" onerror="this.src='https://placehold.co/500x750/333333/ffffff?text=No+Image'">
-                        ${badge}
-                    </div>
-                    <div class="movie-card-body">
-                        <div class="movie-title" title="${title}">${title}</div>
-                        <button class="btn-detail-card">${detailBtnText}</button>
-                    </div>
-                </div>
-            `);
+            container.insertAdjacentHTML('beforeend', buildCardHtml(item, id, title, isMovie, detailBtnText));
         });
 
-        if (status) status.innerText = gridPage >= gridTotalPages - 1 ? "" : "";
+        bindImageFallbacks(container);
+
+        if (status) status.innerText = '';
     } catch (e) {
-        if (status) status.innerText = "Error";
+        if (status) status.innerText = t('toast-error');
     } finally {
         isGridLoading = false;
     }

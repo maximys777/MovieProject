@@ -1,52 +1,53 @@
 <!DOCTYPE html>
-<html lang="ru">
+    <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title data-i18n="profile-title">Мій Профіль - КиноТренды</title>
+    <title data-i18n="page-title-profile">My Profile - MovieTracker</title>
     <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="/css/profile.css">
     <script src="/js/translations.js"></script>
+    <script src="/js/i18n.js"></script>
 </head>
 <body>
 
 <nav class="navbar">
-    <a href="/" class="navbar-logo">Кино<span>Тренды</span></a>
+    <a href="/" class="navbar-logo">Movie<span>Tracker</span></a>
     <div class="nav-links">
-        <a href="index.html" style="color: var(--primary-color); font-weight: bold;" data-i18n="nav-home">Головна</a>
+        <a href="index.html" style="color: var(--primary-color); font-weight: bold;" data-i18n="nav-home">Home</a>
         <div class="search-container">
-            <input type="text" id="search-input" class="search-input" data-i18n="search-placeholder" placeholder="Шукати...">
+            <input type="text" id="search-input" class="search-input" data-i18n="search-placeholder" placeholder="Search movies and TV shows...">
             <div id="search-spinner" class="search-spinner hidden"></div>
             <div id="search-dropdown" class="search-dropdown hidden">
                 <div id="search-results"></div>
-                <button id="btn-view-all-search" class="btn-view-all-search hidden" onclick="goToSearchPage()" data-i18n="btn-all-results">Дивитися всі результати</button>
+                <button id="btn-view-all-search" class="btn-view-all-search hidden" data-action="search-all" data-i18n="btn-all-results">View all results</button>
             </div>
         </div>
-        <select id="langSelect" class="lang-select" onchange="changeLanguage(this.value)">
+        <select id="langSelect" class="lang-select">
             <option value="en">EN</option>
             <option value="ru">RU</option>
             <option value="uk">UK</option>
         </select>
         <a href="profile.html" class="profile-link">
-            <img src="https://ui-avatars.com/api/?name=User&background=e50914&color=fff" alt="Аватар" class="avatar">
+            <img src="https://ui-avatars.com/api/?name=User&background=e50914&color=fff" alt="Avatar" data-i18n="alt-avatar" data-i18n-attr="alt" class="avatar">
         </a>
     </div>
 </nav>
 
 <div class="content-wrapper">
     <div class="profile-header">
-        <img src="https://ui-avatars.com/api/?name=User&background=e50914&color=fff" alt="Аватар" class="profile-avatar">
+        <img src="https://ui-avatars.com/api/?name=User&background=e50914&color=fff" alt="Avatar" data-i18n="alt-avatar" data-i18n-attr="alt" class="profile-avatar">
         <div class="profile-info">
-            <h1 id="profile-name" data-i18n="profile-title">Мій Профіль</h1>
-            <p data-i18n="profile-subtitle">Особиста колекція фільмів та серіалів</p>
+            <h1 id="profile-name" data-i18n="profile-title">My Profile</h1>
+            <p data-i18n="profile-subtitle">Personal collection of movies and TV shows</p>
             <div class="profile-stats">
                 <div class="stat-item">
                     <div class="stat-value" id="total-movies">0</div>
-                    <div class="stat-label" data-i18n="stat-movies">Фільмів</div>
+                    <div class="stat-label" data-i18n="stat-movies">Movies</div>
                 </div>
                 <div class="stat-item">
                     <div class="stat-value" id="total-tv">0</div>
-                    <div class="stat-label" data-i18n="stat-tv">Серіалів</div>
+                    <div class="stat-label" data-i18n="stat-tv">TV Shows</div>
                 </div>
             </div>
         </div>
@@ -54,25 +55,25 @@
 
     <div class="slider-section">
         <div class="section-header">
-            <h2 data-i18n="saved-movies">Збережені фільми</h2>
-            <button class="btn-view-all" onclick="openFullGrid('movies')" data-i18n="view-all">Дивитися всі</button>
+            <h2 data-i18n="saved-movies">Saved Movies</h2>
+            <button class="btn-view-all" data-action="open-full-grid" data-grid-type="movies" data-i18n="view-all">View all</button>
         </div>
         <div class="slider-wrapper">
-            <button class="slider-nav prev-slide" onclick="scrollSlider('movies-slider', -450)">&#10094;</button>
+            <button class="slider-nav prev-slide" data-action="scroll-slider" data-slider="movies-slider" data-distance="-450">&#10094;</button>
             <div class="slider-container" id="movies-slider"></div>
-            <button class="slider-nav next-slide" onclick="scrollSlider('movies-slider', 450)">&#10095;</button>
+            <button class="slider-nav next-slide" data-action="scroll-slider" data-slider="movies-slider" data-distance="450">&#10095;</button>
         </div>
     </div>
 
     <div class="slider-section" style="margin-top: 50px;">
         <div class="section-header">
-            <h2 data-i18n="saved-tv">Збережені серіали</h2>
-            <button class="btn-view-all" onclick="openFullGrid('tv-shows')" data-i18n="view-all">Дивитися всі</button>
+            <h2 data-i18n="saved-tv">Saved TV Shows</h2>
+            <button class="btn-view-all" data-action="open-full-grid" data-grid-type="tv-shows" data-i18n="view-all">View all</button>
         </div>
         <div class="slider-wrapper">
-            <button class="slider-nav prev-slide" onclick="scrollSlider('tv-shows-slider', -450)">&#10094;</button>
+            <button class="slider-nav prev-slide" data-action="scroll-slider" data-slider="tv-shows-slider" data-distance="-450">&#10094;</button>
             <div class="slider-container" id="tv-shows-slider"></div>
-            <button class="slider-nav next-slide" onclick="scrollSlider('tv-shows-slider', 450)">&#10095;</button>
+            <button class="slider-nav next-slide" data-action="scroll-slider" data-slider="tv-shows-slider" data-distance="450">&#10095;</button>
         </div>
     </div>
 </div>
@@ -82,7 +83,7 @@
         <div class="modal-body">
             <div class="modal-header-info">
                 <div style="position: relative; flex-shrink: 0;">
-                    <img id="movie-modal-poster" src="" alt="Постер">
+                    <img id="movie-modal-poster" src="" alt="Poster" data-i18n="alt-poster" data-i18n-attr="alt">
                     <div id="movie-modal-rating" class="modal-rating-badge">★ 0.0</div>
                 </div>
                 <div class="modal-details">
@@ -96,17 +97,17 @@
                 </div>
             </div>
             <div class="modal-movie-overview">
-                <h3 style="margin-bottom: 10px; font-size: 18px; color: white;" data-i18n="modal-about">Про фильм</h3>
+                <h3 style="margin-bottom: 10px; font-size: 18px; color: white;" data-i18n="modal-about">About movie</h3>
                 <div class="overview-wrapper">
                     <p id="movie-modal-overview" class="modal-overview-text collapsed">...</p>
                     <button id="movie-read-more" class="btn-read-more" data-i18n="modal-read-more"
-                            onclick="toggleOverview('movie-modal-overview', this)">Читати далі</button>
+                            data-action="toggle-overview" data-target="movie-modal-overview">Read more</button>
                 </div>
             </div>
         </div>
         <div class="modal-footer">
-            <button class="btn-cancel" onclick="closeModal('movie-modal')" data-i18n="modal-close">Закрити</button>
-            <button id="btn-delete-movie" class="btn-delete-action" data-i18n="btn-delete">Видалити зі списку</button>
+            <button class="btn-cancel" data-action="close-modal" data-target="movie-modal" data-i18n="modal-close">Close</button>
+            <button id="btn-delete-movie" class="btn-delete-action" data-i18n="modal-delete">Remove from list</button>
         </div>
     </div>
 </div>
@@ -116,7 +117,7 @@
         <div class="modal-body">
             <div class="modal-header-info">
                 <div style="position: relative; flex-shrink: 0;">
-                    <img id="modal-poster" src="" alt="Постер">
+                    <img id="modal-poster" src="" alt="Poster" data-i18n="alt-poster" data-i18n-attr="alt">
                     <div id="modal-rating" class="modal-rating-badge">★ 0.0</div>
                 </div>
                 <div class="modal-details">
@@ -127,25 +128,25 @@
                     </div>
                     <div id="modal-genres" class="modal-genres"></div>
                     <p class="modal-description" style="color: var(--primary-color); font-weight: bold; margin-top: 10px;">
-                        <span data-i18n="your-progress">Твій прогресс:</span> <span id="modal-status-text">...</span>
+                        <span data-i18n="your-progress">Your progress</span>: <span id="modal-status-text">...</span>
                     </p>
                     <div class="overview-wrapper">
                         <p id="modal-overview" class="modal-overview-text collapsed">...</p>
                         <button id="tv-read-more" class="btn-read-more" data-i18n="modal-read-more"
-                                onclick="toggleOverview('modal-overview', this)">Читати далі</button>
+                                data-action="toggle-overview" data-target="modal-overview">Read more</button>
                     </div>
                 </div>
             </div>
             <div class="modal-progress-section">
-                <div class="progress-header"><h3 data-i18n="history-watched">Історія перегляду</h3></div>
+                <div class="progress-header"><h3 data-i18n="history-watched">Viewing history</h3></div>
                 <div id="season-tabs" class="season-tabs"></div>
-                <h4 id="episodes-title" style="margin-top: 20px; margin-bottom: 15px; font-size: 16px;" data-i18n="season-episodes">Епізоди сезону</h4>
+                <h4 id="episodes-title" style="margin-top: 20px; margin-bottom: 15px; font-size: 16px;" data-i18n="season-episodes">Season episodes</h4>
                 <div id="episodes-grid" class="episodes-grid"></div>
             </div>
         </div>
         <div class="modal-footer">
-            <button class="btn-cancel" onclick="closeModal('progress-modal')" data-i18n="modal-close">Закрити</button>
-            <button id="btn-delete-tv" class="btn-delete-action" data-i18n="btn-delete">Видалити зі списку</button>
+            <button class="btn-cancel" data-action="close-modal" data-target="progress-modal" data-i18n="modal-close">Close</button>
+            <button id="btn-delete-tv" class="btn-delete-action" data-i18n="modal-delete">Remove from list</button>
         </div>
     </div>
 </div>
@@ -153,21 +154,19 @@
 <div id="full-grid-modal" class="modal-overlay">
     <div class="modal-content" style="max-width: 1100px; height: 85vh;">
         <div class="modal-body" id="grid-scroll-container">
-            <h2 id="full-grid-title" style="margin-bottom: 20px;" data-i18n="all-saved-title">Всі збережені</h2>
+            <h2 id="full-grid-title" style="margin-bottom: 20px;" data-i18n="all-saved-title">All saved</h2>
 
             <div style="margin-bottom: 25px;">
-                <input type="text" id="grid-search-input" class="search-input" placeholder="Шукати у збережених..."
-                       style="width: 100%; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(0,0,0,0.5); padding: 14px 20px; color: white; font-size: 16px; outline: none; transition: border-color 0.2s;"
-                       autocomplete="off"
-                       onfocus="this.style.borderColor='var(--primary-color)'"
-                       onblur="this.style.borderColor='var(--card-border)'">
+                <input type="text" id="grid-search-input" class="search-input"
+                       data-i18n="profile-search-placeholder" placeholder="Search in saved..."
+                       autocomplete="off">
             </div>
 
             <div id="full-grid-content" class="movies-grid"></div>
             <div id="grid-load-status" class="loading-status" style="margin-top: 20px;"></div>
         </div>
         <div class="modal-footer" style="justify-content: center;">
-            <button class="btn-cancel" onclick="closeModal('full-grid-modal')" data-i18n="close-library">Закрити картотеку</button>
+            <button class="btn-cancel" data-action="close-modal" data-target="full-grid-modal" data-i18n="close-library">Close library</button>
         </div>
     </div>
 </div>
