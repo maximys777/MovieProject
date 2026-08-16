@@ -80,13 +80,14 @@ document.addEventListener('DOMContentLoaded', () => {
 // 1. ЗАГРУЗКА ДАШБОРДА (КАРУСЕЛИ)
 // =======================
 async function loadDashboard() {
+    // Пути без API_BASE_URL — его подставляет watchlistFetch из main.js
     const movieUrl = isMyProfile
-        ? `${API_BASE_URL}/watchlist-movies/me?page=0&size=20&language=${currentLang}`
-        : `${API_BASE_URL}/watchlist-movies/${currentProfileUserId}/user?page=0&size=20&language=${currentLang}`;
+        ? `/watchlist-movies/me?page=0&size=20&language=${currentLang}`
+        : `/watchlist-movies/${currentProfileUserId}/user?page=0&size=20&language=${currentLang}`;
 
     const tvUrl = isMyProfile
-        ? `${API_BASE_URL}/watchlist-tv-shows/me?page=0&size=20&language=${currentLang}`
-        : `${API_BASE_URL}/watchlist-tv-shows/${currentProfileUserId}/user?page=0&size=20&language=${currentLang}`;
+        ? `/watchlist-tv-shows/me?page=0&size=20&language=${currentLang}`
+        : `/watchlist-tv-shows/${currentProfileUserId}/user?page=0&size=20&language=${currentLang}`;
 
     fetchAndRender(movieUrl, 'movies-slider', true);
     fetchAndRender(tvUrl, 'tv-shows-slider', false);
@@ -113,8 +114,8 @@ function buildCardHtml(item, id, title, isMovie, detailBtnText) {
 
 async function fetchAndRender(url, containerId, isMovie) {
     try {
-        const response = await fetch(url);
-        if (response.redirected && response.url.includes('/login.html')) return window.location.href = '/login.html';
+        const response = await watchlistFetch(url);
+        if (response.status === 401) return redirectToLogin();
         if (!response.ok) return;
 
         const data = await response.json();
@@ -265,7 +266,12 @@ async function deleteItem(id, isMovie) {
     const endpoint = isMovie ? `/watchlist-movies?movieId=${id}` : `/watchlist-tv-shows?tvShowId=${id}`;
 
     try {
-        const response = await fetch(API_BASE_URL + endpoint, {method: 'DELETE'});
+        const response = await watchlistFetch(endpoint, {method: 'DELETE'});
+
+        // Удаление намеренно не сохраняем в pendingAction: тихий повтор после логина
+        // обошел бы confirm() выше
+        if (response.status === 401) return redirectToLogin();
+
         if (response.ok) {
             showToast(t('toast-success'));
             closeModal(isMovie ? 'movie-modal' : 'progress-modal');
@@ -327,7 +333,8 @@ async function loadGridPage() {
     }
 
     try {
-        const response = await fetch(`${API_BASE_URL}${endpoint}`);
+        const response = await watchlistFetch(endpoint);
+        if (response.status === 401) return redirectToLogin();
         if (!response.ok) throw new Error('Server error');
 
         const data = await response.json();

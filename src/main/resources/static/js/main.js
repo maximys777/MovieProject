@@ -31,6 +31,68 @@ function showToast(message, isError = false) {
     setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
+// --- АВТОРИЗАЦИЯ И ОТЛОЖЕННЫЕ ДЕЙСТВИЯ ---
+const PENDING_ACTION_KEY = 'pendingAction';
+
+// Все запросы к watchlist помечаем как AJAX: бэкенд отдает на них 401,
+// а не 302 на /login.html с потерей тела запроса
+function watchlistFetch(path, options = {}) {
+    const headers = {'X-Requested-With': 'XMLHttpRequest', ...(options.headers || {})};
+    if (options.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+    return fetch(`${API_BASE_URL}${path}`, {...options, headers});
+}
+
+// Намерение живет только в текущей вкладке — sessionStorage, не localStorage
+function savePendingAction(action) {
+    try {
+        sessionStorage.setItem(PENDING_ACTION_KEY, JSON.stringify(action));
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function redirectToLogin() {
+    window.location.href = '/login.html';
+}
+
+// Доигрываем действие, которое не прошло из-за 401, после успешного логина
+async function replayPendingAction() {
+    const raw = sessionStorage.getItem(PENDING_ACTION_KEY);
+    if (!raw) return;
+
+    // Снимаем намерение ДО запроса: даже при ошибке или падении
+    // оно не должно повториться при следующей загрузке страницы
+    sessionStorage.removeItem(PENDING_ACTION_KEY);
+
+    let pending;
+    try {
+        pending = JSON.parse(raw);
+    } catch (e) {
+        console.error(e);
+        return;
+    }
+    if (!pending || !pending.url || !pending.method) return;
+
+    try {
+        const response = await watchlistFetch(pending.url, {
+            method: pending.method,
+            body: pending.body ? JSON.stringify(pending.body) : undefined
+        });
+
+        // Повторный 401 НЕ уводит на логин и НЕ сохраняется заново —
+        // иначе получится цикл логин → повтор → логин
+        if (response.ok) {
+            showToast(t('toast-success'));
+            // На профиле обновляем карусели и счетчики
+            if (typeof loadDashboard === 'function') loadDashboard();
+        } else {
+            showToast(t('toast-error'), true);
+        }
+    } catch (e) {
+        showToast(t('toast-error'), true);
+    }
+}
+
 // --- КАРТИНКИ ---
 // data-fallback="hide" прячет карточку, любое другое значение — это URL заглушки
 function bindImageFallbacks(root) {
@@ -298,14 +360,22 @@ async function saveMovieToWatchlist() {
     };
 
     try {
-        const response = await fetch(`${API_BASE_URL}/watchlist-movies`, {
+        const response = await watchlistFetch('/watchlist-movies', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(payload)
         });
 
-        if (response.status === 401 || response.status === 403 || response.redirected || response.url.includes('/login.html')) {
-            window.location.href = '/login.html';
+        // Не залогинен: запоминаем, что хотел сделать, и сразу уводим на логин
+        if (response.status === 401) {
+            savePendingAction({
+                action: 'add-to-watchlist-movie',
+                url: '/watchlist-movies',
+                method: 'POST',
+                body: payload,
+                tmdbId: item.id,
+                title: payload.title
+            });
+            redirectToLogin();
             return;
         }
 
@@ -497,14 +567,22 @@ async function saveTvShowProgress() {
     };
 
     try {
-        const res = await fetch(`${API_BASE_URL}/watchlist-tv-shows`, {
+        const res = await watchlistFetch('/watchlist-tv-shows', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(payload)
         });
 
-        if (res.status === 401 || res.status === 403 || res.redirected || res.url.includes('/login.html')) {
-            window.location.href = '/login.html';
+        // Не залогинен: запоминаем прогресс по сериалу и сразу уводим на логин
+        if (res.status === 401) {
+            savePendingAction({
+                action: 'add-to-watchlist-tv',
+                url: '/watchlist-tv-shows',
+                method: 'POST',
+                body: payload,
+                tmdbId: currentShowData.id,
+                title: payload.name
+            });
+            redirectToLogin();
             return;
         }
 
@@ -632,6 +710,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// main.js подключен на index/search/profile, поэтому одного слушателя хватает на все страницы
+document.addEventListener('DOMContentLoaded', replayPendingAction);
 
 function formatList(list) {
     if (!list || !Array.isArray(list) || list.length === 0) return '...';
