@@ -1,4 +1,4 @@
-package com.maximys777.project.watchlist.service;
+package com.maximys777.project.watchlist.service.movie;
 
 import com.maximys777.project.exceptions.exceptions.AlreadyExistsException;
 import com.maximys777.project.exceptions.exceptions.MovieNotFoundException;

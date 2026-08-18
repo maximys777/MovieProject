@@ -1,9 +1,11 @@
 package com.maximys777.project.watchlist.controller.movie;
 
+import com.maximys777.project.AbstractIntegrationTest;
 import com.maximys777.project.security.entity.UserEntity;
 import com.maximys777.project.security.repository.UserRepository;
 import com.maximys777.project.tmdb.dto.response.movie.MovieDetails;
-import com.maximys777.project.tmdb.service.TMDBService;
+import com.maximys777.project.tmdb.dto.response.movie.other.GenreResponse;
+import com.maximys777.project.tmdb.dto.response.movie.other.ProductionCountryResponse;
 import com.maximys777.project.watchlist.movie.dto.request.AddToWatchlistMovieRequest;
 import com.maximys777.project.watchlist.movie.entity.WatchlistMovieEntity;
 import com.maximys777.project.watchlist.movie.repository.WatchlistMovieRepository;
@@ -11,253 +13,203 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import tools.jackson.databind.ObjectMapper;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import reactor.core.publisher.Mono;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
-@AutoConfigureMockMvc
-@Testcontainers
-public class WatchlistMovieControllerTest {
-
-    @Container
-    public static PostgreSQLContainer<?> postgreSQLContainer = new PostgreSQLContainer<>("postgres:15-alpine");
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @MockitoBean
-    private TMDBService tmdbService;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @Autowired
-    private WatchlistMovieRepository watchlistMovieRepository;
+public class WatchlistMovieControllerTest extends AbstractIntegrationTest {
+    private static final String EMAIL = "test@gmail.com";
 
     @Autowired
     private UserRepository userRepository;
 
-    private WatchlistMovieEntity watchlistMovieEntity;
-    private UserEntity userEntity;
+    @Autowired
+    private WatchlistMovieRepository watchlistMovieRepository;
 
-    @DynamicPropertySource
-    static void setProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgreSQLContainer::getJdbcUrl);
-        registry.add("spring.datasource.password", postgreSQLContainer::getPassword);
-        registry.add("spring.datasource.username", postgreSQLContainer::getUsername);
-    }
+    private UserEntity user;
 
     @BeforeEach
-    void setUp() {
-        watchlistMovieRepository.deleteAll();
-        userRepository.deleteAll();
-
-        userEntity = UserEntity.builder()
-                .email("test@gmail.com")
-                .googleId("100003400T")
-                .profilePictureUrl("http://localhost:8080/user/image")
-                .build();
-
-        userRepository.save(userEntity);
-
-        watchlistMovieEntity = WatchlistMovieEntity.builder()
-                .posterUrl("http://localhost:8080/image/poster")
-                .title("Movie")
-                .movieId(1005213L)
-                .releaseDate(LocalDateTime.of(2024, 3, 17, 10, 5))
-                .popularity(BigDecimal.valueOf(137.8))
-                .userId(userEntity.getId())
-                .build();
-
-        watchlistMovieRepository.save(watchlistMovieEntity);
+    void setUpUser() {
+        user = userRepository.save(UserEntity.builder()
+                .email(EMAIL)
+                .googleId("google-123")
+                .build());
     }
 
     @Test
-    void addMovieToWatchlist_ShouldReturnCreated_WhenSuccess() throws Exception {
+    void addMovieToWatchlist_shouldCreateEntry_whenMovieNotInWatchlistYet() throws Exception {
         AddToWatchlistMovieRequest request = AddToWatchlistMovieRequest.builder()
-                .posterPath("http://localhost:8080/movie/image")
-                .title("New movie")
-                .movieId(1005555L)
-                .releaseDate(LocalDateTime.of(2020, 5, 12, 10, 5))
-                .popularity(BigDecimal.valueOf(137.8))
+                .movieId(1005213L)
+                .title("Movie")
                 .build();
 
         mockMvc.perform(post("/watchlist-movies")
-                        .with(oidcLogin()
-                                .authorities(new SimpleGrantedAuthority("SCOPE_profile"))
-                                .idToken(token -> token.claim("email", "test@gmail.com")))
-                        .content(objectMapper.writeValueAsString(request))
-                        .contentType(MediaType.APPLICATION_JSON))
+                        .with(authenticatedUser(EMAIL))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").exists())
-                .andExpect(jsonPath("$.title").exists())
-                .andExpect(jsonPath("$.movieId").exists())
-                .andExpect(jsonPath("$.userId").exists());
+                .andExpect(jsonPath("$.id").isNumber())
+                .andExpect(jsonPath("$.movieId").value(1005213L))
+                .andExpect(jsonPath("$.userId").value(user.getId()));
 
-        assertThat(watchlistMovieRepository.count()).isEqualTo(2);
+        List<WatchlistMovieEntity> saved = watchlistMovieRepository.findAll();
+
+        assertThat(saved).hasSize(1);
+        assertThat(saved.getFirst().getMovieId()).isEqualTo(1005213L);
+        assertThat(saved.getFirst().getUserId()).isEqualTo(user.getId());
     }
 
     @Test
-    void addMovieToWatchlist_ShouldThrowAlreadyExistsException_WhenMovieAlreadyInWatchlist(){
-        AddToWatchlistMovieRequest request = AddToWatchlistMovieRequest.builder()
-                .posterPath("http://localhost:8080/movie/image")
-                .title("Movie")
+    void addMovieToWatchlist_shouldReturnConflict_whenMovieAlreadyInWatchlist() throws Exception {
+
+        watchlistMovieRepository.save(WatchlistMovieEntity.builder()
                 .movieId(1005213L)
-                .releaseDate(LocalDateTime.of(2024, 3, 17, 10, 5))
-                .popularity(BigDecimal.valueOf(137.8))
+                .userId(user.getId())
+                .build());
+
+        AddToWatchlistMovieRequest request = AddToWatchlistMovieRequest.builder()
+                .movieId(1005213L)
+                .title("Movie")
                 .build();
 
-        Exception exception = assertThrows(Exception.class, () ->
-            mockMvc.perform(post("/watchlist-movies")
-                    .with(oidcLogin()
-                            .authorities(new SimpleGrantedAuthority("SCOPE_profile"))
-                            .idToken(token -> token.claim("email", "test@gmail.com")))
-                    .content(objectMapper.writeValueAsString(request))
-                    .contentType(MediaType.APPLICATION_JSON))
-        );
-
-        assertThat(exception.getCause()).isNotNull();
-        assertThat(exception.getCause()).isInstanceOf(RuntimeException.class);
-        assertThat(exception.getCause().getMessage()).isEqualTo("Movie with id 1005213 already exists in your watchlist");
+        mockMvc.perform(post("/watchlist-movies")
+                        .with(authenticatedUser(EMAIL))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.message")
+                        .value("Movie with id 1005213 already exists in your watchlist"));
 
         assertThat(watchlistMovieRepository.count()).isEqualTo(1);
     }
 
     @Test
-    void addMovieToWatchlist_ShouldThrowUserNotFoundException_WhenUserNotAuthenticated() throws Exception {
+    void addMovieToWatchlist_shouldReturnUnauthorized_whenUserNotAuthenticated() throws Exception {
         AddToWatchlistMovieRequest request = AddToWatchlistMovieRequest.builder()
-                .posterPath("http://localhost:8080/movie/image")
-                .title("Movie")
                 .movieId(1005213L)
-                .releaseDate(LocalDateTime.of(2024, 3, 17, 10, 5))
-                .popularity(BigDecimal.valueOf(137.8))
+                .title("Movie")
                 .build();
 
         mockMvc.perform(post("/watchlist-movies")
-                        .content(objectMapper.writeValueAsString(request))
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().is3xxRedirection());
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized());
+
+        assertThat(watchlistMovieRepository.count()).isZero();
     }
 
     @Test
-    void getWatchlistMovie_ShouldReturnUsersInformation_WhenSuccess() throws Exception {
-        MovieDetails fakeTmdbDetails = new MovieDetails(
-                List.of(), "Fake Overview", "/fake_poster.jpg", List.of(),
-                "2024-03-17", 120, "Fake Movie", 8.5
-        );
+    void addMovieToWatchlist_shouldReturnNotFound_whenUserNotFoundInDatabase() throws Exception {
+        AddToWatchlistMovieRequest request = AddToWatchlistMovieRequest.builder()
+                .movieId(1005213L)
+                .title("Movie")
+                .build();
 
-        Mockito.when(tmdbService.getMovieDetails(Mockito.anyLong(), Mockito.any()))
-                .thenReturn(reactor.core.publisher.Mono.just(fakeTmdbDetails));
-
-        mockMvc.perform(get("/watchlist-movies/{userId}/user", userEntity.getId())
-                        .param("page", "0")
-                        .param("size", "10")
-                        .param("language", "en")
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].posterUrl").value("/fake_poster.jpg"))
-                .andExpect(jsonPath("$.content[0].title").value("Fake Movie"));
-    }
-
-    @Test
-    void getWatchlistMovie_ShouldThrowUserNotFoundException_WhenUserNotFound() throws Exception {
-        mockMvc.perform(get("/watchlist-movies/{userId}/user", 9999L)
-                        .param("page", "0")
-                        .param("size", "10")
-                        .param("language", "en")
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().is3xxRedirection());
-    }
-
-    @Test
-    void getMyWatchlistMovie_ShouldReturnUserOwnWatchlist_WhenSuccess() throws Exception {
-
-        MovieDetails fakeTmdbDetails = new MovieDetails(
-                List.of(), "Fake Overview", "/fake_poster.jpg", List.of(),
-                "2024-03-17", 120, "Movie", 8.5
-        );
-
-        Mockito.when(tmdbService.getMovieDetails(Mockito.anyLong(), Mockito.any()))
-                .thenReturn(reactor.core.publisher.Mono.just(fakeTmdbDetails));
-
-        mockMvc.perform(get("/watchlist-movies/me")
-                        .with(oidcLogin()
-                                .authorities(new SimpleGrantedAuthority("SCOPE_profile"))
-                                .idToken(token -> token.claim("email", "test@gmail.com"))
-                        )
-                        .param("page", "0")
-                        .param("size", "10")
-                        .param("language", "en")
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].id").exists())
-                .andExpect(jsonPath("$.content[0].posterUrl").exists())
-                .andExpect(jsonPath("$.content[0].title").value("Movie"))
-                .andExpect(jsonPath("$.content[0].overview").exists())
-                .andExpect(jsonPath("$.content[0].runtime").exists())
-                .andExpect(jsonPath("$.content[0].releaseDate").exists())
-                .andExpect(jsonPath("$.content[0].voteAverage").exists())
-                .andExpect(jsonPath("$.content[0].userId").value(userEntity.getId()))
-                .andExpect(jsonPath("$.content[0].genres").exists())
-                .andExpect(jsonPath("$.content[0].productionCountries").exists());
-    }
-
-    @Test
-    void getMyWatchlistMovie_ShouldThrowUserNotFoundException_WhenUserNotAuthenticated() throws Exception {
-        mockMvc.perform(post("/watchlist-movies/me")
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().is3xxRedirection());
-    }
-
-    @Test
-    void deleteMovieFromWatchlist_ShouldDeleteMovieFromWatchlist_WhenSuccess() throws Exception {
-        mockMvc.perform(delete("/watchlist-movies")
-                        .with(oidcLogin()
-                                .authorities(new SimpleGrantedAuthority("SCOPE_profile"))
-                                .idToken(token -> token.claim("email", "test@gmail.com")))
-                        .param("movieId", String.valueOf(watchlistMovieEntity.getMovieId())))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    void deleteMovieFromWatchlist_ShouldThrowUserNotFoundException_WhenUserNotAuthenticated() throws Exception {
-        mockMvc.perform(delete("/watchlist-movies")
-                        .param("movieId", String.valueOf(watchlistMovieEntity.getMovieId())))
-                .andExpect(status().is3xxRedirection());
-    }
-
-    @Test
-    void deleteMovieFromWatchlist_ShouldThrowNotFound_WhenMovieNotFound() throws Exception {
         mockMvc.perform(post("/watchlist-movies")
-                .with(oidcLogin()
-                        .authorities(new SimpleGrantedAuthority("SCOPE_profile"))
-                        .idToken(token -> token.claim("email", "test@gmail.com")))
-                .param("movieId", "999999")
-                .contentType(MediaType.APPLICATION_JSON));
+                        .with(authenticatedUser("random@gmail.com"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message")
+                        .value("User not found"));
 
-        assertThat(watchlistMovieRepository.count()).isEqualTo(1);
+        assertThat(watchlistMovieRepository.count()).isZero();
+    }
+
+    @Test
+    void getWatchlistMovie_shouldReturnPage_whenUsersWatchlistFound() throws Exception {
+        watchlistMovieRepository.save(WatchlistMovieEntity.builder()
+                .movieId(1005213L)
+                .userId(user.getId())
+                .build());
+
+        MovieDetails details = new MovieDetails(
+                List.of(new GenreResponse(28L, "Action")),
+                "Overview",
+                "/poster.jpg",
+                List.of(new ProductionCountryResponse("US", "United States")),
+                "2024-03-17",
+                120,
+                "Title",
+                6.0
+        );
+
+        Mockito.when(tmdbService.getMovieDetails(Mockito.eq(1005213L), Mockito.any()))
+                .thenReturn(Mono.just(details));
+
+        mockMvc.perform(get("/watchlist-movies/{userId}/user", user.getId())
+                        .param("language", "en")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.totalElements").value(1))
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].movieId").value(1005213L))
+                .andExpect(jsonPath("$.content[0].userId").value(user.getId()))
+                .andExpect(jsonPath("$.content[0].title").value("Title"))
+                .andExpect(jsonPath("$.content[0].overview").value("Overview"))
+                .andExpect(jsonPath("$.content[0].runtime").value(120))
+                .andExpect(jsonPath("$.content[0].genres[0]").value("Action"));
+    }
+
+    @Test
+    void getWatchlistMovie_shouldReturnNotFound_whenUserNotFoundInDatabase() throws Exception {
+        mockMvc.perform(get("/watchlist-movies/{userId}/user?", 999L)
+                        .with(authenticatedUser("testuser2@gmail.com"))
+                        .param("language", "en")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message")
+                        .value("User not found"));
+    }
+
+    @Test
+    void getWatchlistMovie_shouldReturnPage_whenUserNotAuthenticated() throws Exception {
+        watchlistMovieRepository.save(WatchlistMovieEntity.builder()
+                .movieId(1005213L)
+                .userId(user.getId())
+                .build());
+
+        MovieDetails details = new MovieDetails(
+                List.of(new GenreResponse(28L, "Action")),
+                "Overview",
+                "/poster.jpg",
+                List.of(new ProductionCountryResponse("US", "United States")),
+                "2024-03-17",
+                120,
+                "Title",
+                6.0
+        );
+
+        Mockito.when(tmdbService.getMovieDetails(Mockito.eq(1005213L), Mockito.any()))
+                .thenReturn(Mono.just(details));
+
+        mockMvc.perform(get("/watchlist-movies/{userId}/user?", user.getId())
+                        .param("language", "en")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.totalElements").value(1))
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].movieId").value(1005213L))
+                .andExpect(jsonPath("$.content[0].userId").value(user.getId()))
+                .andExpect(jsonPath("$.content[0].title").value("Title"))
+                .andExpect(jsonPath("$.content[0].overview").value("Overview"))
+                .andExpect(jsonPath("$.content[0].runtime").value(120))
+                .andExpect(jsonPath("$.content[0].genres[0]").value("Action"));
+    }
+
+    private static RequestPostProcessor authenticatedUser(String email) {
+        return oidcLogin().idToken(token -> token.claim("email", email));
     }
 }
