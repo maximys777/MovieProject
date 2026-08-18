@@ -59,7 +59,7 @@ public class WatchlistTvShowController {
             @ApiResponse(responseCode = "503", description = "Service unavailable (TMDB service down)")
     })
     @GetMapping("/{userId}/user")
-    public Mono<Page<WatchlistTvShowResponse>> getUsersWatchlistTvShows(@PathVariable Long userId,
+    public Page<WatchlistTvShowResponse> getUsersWatchlistTvShows(@PathVariable Long userId,
                                                                         Pageable pageable,
                                                                         @RequestParam LanguageType language) {
         return watchlistTvShowService.findUsersWatchlistTvShow(userId, pageable, language);
@@ -74,7 +74,7 @@ public class WatchlistTvShowController {
             @ApiResponse(responseCode = "503", description = "Service unavailable (TMDB service down)")
     })
     @GetMapping("/me")
-    public Mono<Page<WatchlistTvShowResponse>> getMyWatchlistTvShows(@AuthenticationPrincipal OidcUser oidcUser,
+    public Page<WatchlistTvShowResponse> getMyWatchlistTvShows(@AuthenticationPrincipal OidcUser oidcUser,
                                                                      Pageable pageable,
                                                                      @RequestParam LanguageType language) {
         return watchlistTvShowService.getAuthenticatedUserWatchlist(oidcUser, pageable, language);
