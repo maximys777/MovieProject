@@ -1,4 +1,4 @@
-package com.maximys777.project.watchlist.service.movie;
+package com.maximys777.project.watchlist.movie.service;
 
 import com.maximys777.project.exceptions.exceptions.AlreadyExistsException;
 import com.maximys777.project.exceptions.exceptions.MovieNotFoundException;
@@ -16,7 +16,6 @@ import com.maximys777.project.watchlist.movie.dto.response.WatchlistMovieRespons
 import com.maximys777.project.watchlist.movie.entity.WatchlistMovieEntity;
 import com.maximys777.project.watchlist.movie.mapper.WatchlistMovieMapper;
 import com.maximys777.project.watchlist.movie.repository.WatchlistMovieRepository;
-import com.maximys777.project.watchlist.movie.service.WatchlistMovieService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

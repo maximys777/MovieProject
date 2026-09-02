@@ -1,5 +1,6 @@
 package com.maximys777.project.tmdb.service;
 
+import com.maximys777.project.exceptions.exceptions.ServiceUnavailable;
 import com.maximys777.project.tmdb.common.LanguageType;
 import com.maximys777.project.tmdb.common.TimeWindow;
 import com.maximys777.project.tmdb.dto.response.movie.MovieDetails;
@@ -12,7 +13,6 @@ import com.maximys777.project.tmdb.dto.response.tvshow.TrendTvShowResponse;
 import com.maximys777.project.tmdb.dto.response.tvshow.TvShowResultResponse;
 import com.maximys777.project.watchlist.tvshow.dto.response.seasons.SeasonResponse;
 import com.maximys777.project.watchlist.tvshow.dto.response.seasons.TvShowDetailsResponse;
-import com.maximys777.project.exceptions.exceptions.ServiceUnavailable;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;

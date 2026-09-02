@@ -97,6 +97,7 @@ public class WatchlistMovieController {
             @ApiResponse(responseCode = "500", description = "Internal server error")
     })
     @DeleteMapping
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteMovieFromWatchlist(@AuthenticationPrincipal OidcUser oidcUser,
                                          @RequestParam Long movieId) {
         watchlistMovieService.deleteMovieFromWatchlist(oidcUser, movieId);
