@@ -60,8 +60,8 @@ public class WatchlistMovieController {
     })
     @GetMapping("/{userId}/user")
     public Page<WatchlistMovieResponse> getWatchlistMovie(@PathVariable Long userId,
-                                                                Pageable pageable,
-                                                                @RequestParam LanguageType language) {
+                                                          Pageable pageable,
+                                                          @RequestParam LanguageType language) {
         return watchlistMovieService.findUsersWatchlistMovie(userId, pageable, language);
     }
 
@@ -75,8 +75,8 @@ public class WatchlistMovieController {
     })
     @GetMapping("/me")
     public Page<WatchlistMovieResponse> getMyWatchlistMovie(@AuthenticationPrincipal OidcUser oidcUser,
-                                                                  Pageable pageable,
-                                                                  @RequestParam LanguageType language) {
+                                                            Pageable pageable,
+                                                            @RequestParam LanguageType language) {
         return watchlistMovieService.getAuthenticatedUserWatchlist(oidcUser, pageable, language);
     }
 
@@ -97,6 +97,7 @@ public class WatchlistMovieController {
             @ApiResponse(responseCode = "500", description = "Internal server error")
     })
     @DeleteMapping
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteMovieFromWatchlist(@AuthenticationPrincipal OidcUser oidcUser,
                                          @RequestParam Long movieId) {
         watchlistMovieService.deleteMovieFromWatchlist(oidcUser, movieId);

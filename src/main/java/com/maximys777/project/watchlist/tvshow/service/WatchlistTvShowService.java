@@ -103,7 +103,7 @@ public class WatchlistTvShowService {
         List<CompletableFuture<WatchlistTvShowResponse>> entityToResponse = entityPage.getContent().stream()
                 .map(entity -> CompletableFuture.supplyAsync(() -> {
                     try {
-                        TvShowDetailsResponse tvShowDetails = tmdbService.getTvShowDetails(entity.getId()).block();
+                        TvShowDetailsResponse tvShowDetails = tmdbService.getTvShowDetails(entity.getTvShowId()).block();
 
                         if (tvShowDetails != null) {
                             List<String> genres = getGenreFromTvShowDetails(tvShowDetails);
@@ -155,7 +155,7 @@ public class WatchlistTvShowService {
 
     private UserEntity handleUserNotFound(String userEmail) {
         return userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new UsernameNotFoundException("User  not found"));
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     }
 
     private List<String> getGenreFromTvShowDetails(TvShowDetailsResponse response) {

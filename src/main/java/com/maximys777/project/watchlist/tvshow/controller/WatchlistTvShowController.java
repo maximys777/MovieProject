@@ -24,7 +24,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import reactor.core.publisher.Mono;
 
 @Tag(name = "Watchlist TV Shows", description = "Endpoints for managing TV show watchlist")
 @RestController
@@ -59,9 +58,9 @@ public class WatchlistTvShowController {
             @ApiResponse(responseCode = "503", description = "Service unavailable (TMDB service down)")
     })
     @GetMapping("/{userId}/user")
-    public Mono<Page<WatchlistTvShowResponse>> getUsersWatchlistTvShows(@PathVariable Long userId,
-                                                                        Pageable pageable,
-                                                                        @RequestParam LanguageType language) {
+    public Page<WatchlistTvShowResponse> getUsersWatchlistTvShows(@PathVariable Long userId,
+                                                                  Pageable pageable,
+                                                                  @RequestParam LanguageType language) {
         return watchlistTvShowService.findUsersWatchlistTvShow(userId, pageable, language);
     }
 
@@ -74,9 +73,9 @@ public class WatchlistTvShowController {
             @ApiResponse(responseCode = "503", description = "Service unavailable (TMDB service down)")
     })
     @GetMapping("/me")
-    public Mono<Page<WatchlistTvShowResponse>> getMyWatchlistTvShows(@AuthenticationPrincipal OidcUser oidcUser,
-                                                                     Pageable pageable,
-                                                                     @RequestParam LanguageType language) {
+    public Page<WatchlistTvShowResponse> getMyWatchlistTvShows(@AuthenticationPrincipal OidcUser oidcUser,
+                                                               Pageable pageable,
+                                                               @RequestParam LanguageType language) {
         return watchlistTvShowService.getAuthenticatedUserWatchlist(oidcUser, pageable, language);
     }
 
@@ -89,6 +88,7 @@ public class WatchlistTvShowController {
             @ApiResponse(responseCode = "500", description = "Internal server error")
     })
     @DeleteMapping()
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteTvShowFromWatchlist(@AuthenticationPrincipal OidcUser oidcUser,
                                           @RequestParam Long tvShowId) {
         watchlistTvShowService.deleteTvShowFromWatchlist(oidcUser, tvShowId);
