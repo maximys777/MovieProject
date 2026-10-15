@@ -62,6 +62,8 @@ const translations = {
         "episode-label": "Серия",
         "episodes-of-season": "Эпизоды {n} сезона",
         "confirm-delete": "Вы уверены?",
+        "nav-login": "Войти",
+        "toast-already-added": "Уже в вашем списке",
         "alt-avatar": "Аватар",
         "alt-poster": "Постер"
     },
@@ -128,6 +130,8 @@ const translations = {
         "episode-label": "Серія",
         "episodes-of-season": "Епізоди {n} сезону",
         "confirm-delete": "Ви впевнені?",
+        "nav-login": "Увійти",
+        "toast-already-added": "Вже у вашому списку",
         "alt-avatar": "Аватар",
         "alt-poster": "Постер"
     },
@@ -194,6 +198,8 @@ const translations = {
         "episode-label": "Episode",
         "episodes-of-season": "Episodes of season {n}",
         "confirm-delete": "Are you sure?",
+        "nav-login": "Log in",
+        "toast-already-added": "Already in your list",
         "alt-avatar": "Avatar",
         "alt-poster": "Poster"
     }
