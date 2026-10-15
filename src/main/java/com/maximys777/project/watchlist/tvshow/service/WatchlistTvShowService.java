@@ -103,7 +103,7 @@ public class WatchlistTvShowService {
         List<CompletableFuture<WatchlistTvShowResponse>> entityToResponse = entityPage.getContent().stream()
                 .map(entity -> CompletableFuture.supplyAsync(() -> {
                     try {
-                        TvShowDetailsResponse tvShowDetails = tmdbService.getTvShowDetails(entity.getTvShowId()).block();
+                        TvShowDetailsResponse tvShowDetails = tmdbService.getTvShowDetails(entity.getTvShowId(), language).block();
 
                         if (tvShowDetails != null) {
                             List<String> genres = getGenreFromTvShowDetails(tvShowDetails);
