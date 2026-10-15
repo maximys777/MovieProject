@@ -99,6 +99,8 @@ async function replayPendingAction() {
             showToast(t('toast-success'));
             // На профиле обновляем карусели и счетчики
             if (typeof loadDashboard === 'function') loadDashboard();
+        } else if (response.status === 409) {
+            showToast(t('toast-already-added'), true);
         } else {
             showToast(t('toast-error'), true);
         }
@@ -412,6 +414,8 @@ async function saveMovieToWatchlist() {
         if (response.ok) {
             showToast(t('toast-success'));
             closeMovieModal();
+        } else if (response.status === 409) {
+            showToast(t('toast-already-added'), true);
         } else {
             showToast(t('toast-error'), true);
         }
