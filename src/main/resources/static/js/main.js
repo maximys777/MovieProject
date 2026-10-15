@@ -69,6 +69,75 @@ function redirectToLogin() {
     window.location.href = '/login.html';
 }
 
+// --- ТЕКУЩИЙ ПОЛЬЗОВАТЕЛЬ (ШАПКА, АВАТАР) ---
+let currentUserPromise = null;
+
+// Один запрос на страницу, результат делят шапка и профиль.
+// {status:'user', user} — залогинен; {status:'guest'} — 401;
+// {status:'unknown'} — любая другая ошибка (шапка тогда остается с обычной иконкой)
+function getCurrentUser() {
+    if (!currentUserPromise) {
+        currentUserPromise = watchlistFetch('/users/me')
+            .then(async response => {
+                if (response.status === 401) return {status: 'guest'};
+                if (!response.ok) return {status: 'unknown'};
+                return {status: 'user', user: await response.json()};
+            })
+            .catch(() => ({status: 'unknown'}));
+    }
+    return currentUserPromise;
+}
+
+function fallbackAvatarUrl(name) {
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=e50914&color=fff`;
+}
+
+// Фото Google иногда не грузится (hotlink-защита, битая ссылка), поэтому всегда есть запасной аватар
+function setAvatar(img, url, name) {
+    const fallback = fallbackAvatarUrl(name);
+    img.referrerPolicy = 'no-referrer';
+    img.addEventListener('error', () => {
+        if (img.src !== fallback) img.src = fallback;
+    }, {once: true});
+    img.src = /^https:\/\//.test(url || '') ? url : fallback;
+}
+
+function renderAuthSlot(result) {
+    const slot = document.getElementById('auth-slot');
+    if (!slot) return;
+    slot.innerHTML = '';
+
+    if (result.status === 'guest') {
+        const login = document.createElement('a');
+        login.href = '/login.html';
+        login.className = 'btn-login';
+        login.dataset.i18n = 'nav-login';
+        login.textContent = t('nav-login');
+        slot.appendChild(login);
+        return;
+    }
+
+    const user = result.user || {};
+    const link = document.createElement('a');
+    link.href = 'profile.html';
+    link.className = 'profile-link';
+    if (user.userName) link.title = user.userName;
+
+    const img = document.createElement('img');
+    img.className = 'avatar';
+    img.dataset.i18n = 'alt-avatar';
+    img.dataset.i18nAttr = 'alt';
+    img.alt = t('alt-avatar');
+    setAvatar(img, user.profilePictureUrl, user.userName);
+
+    link.appendChild(img);
+    slot.appendChild(link);
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    renderAuthSlot(await getCurrentUser());
+});
+
 // Доигрываем действие, которое не прошло из-за 401, после успешного логина
 async function replayPendingAction() {
     const raw = sessionStorage.getItem(PENDING_ACTION_KEY);

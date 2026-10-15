@@ -71,6 +71,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Большой аватар: на своей странице показываем фото из Google
+    if (isMyProfile) {
+        getCurrentUser().then(result => {
+            const avatar = document.getElementById('profile-avatar');
+            if (avatar && result.status === 'user') {
+                setAvatar(avatar, result.user.profilePictureUrl, result.user.userName);
+            }
+        });
+    }
+
     // Перезагружаем данные при смене языка
     window.onLanguageChanged = () => {
         invalidateGridCache();
