@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -56,7 +57,7 @@ public class SearchController {
     @GetMapping("/full")
     public Mono<MultiSearchResponse> fullSearch(@RequestParam String query,
                                                 @RequestParam(defaultValue = "en", required = false) LanguageType language,
-                                                @RequestParam(defaultValue = "1") int page) {
+                                                @RequestParam(defaultValue = "1") @Min(1) int page) {
         return searchService.fullSearch(query, language, page);
     }
 }
