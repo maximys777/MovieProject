@@ -11,6 +11,12 @@ let currentProfileUserId = null;
 let currentGridQuery = '';
 let gridSearchTimeout = null;
 
+// Бэкенд не умеет искать по названию (в БД лежат только id, названия приходят из TMDB),
+// поэтому при поиске грузим всю коллекцию один раз и фильтруем уже в браузере
+let gridGeneration = 0;        // растет при каждом сбросе грида: ответы прошлого поколения игнорируются
+let gridAllItemsPromise = null;
+let gridAllItemsKey = '';      // тип + язык, для которых загружена коллекция
+
 let gridType = '';
 let gridPage = 0;
 let gridTotalPages = 1;
@@ -35,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         document.querySelectorAll('.btn-delete-action').forEach(btn => btn.style.display = 'none');
 
-        // Скрываем поиск в чужом профиле, так как бэкенд ищет только по OidcUser (владельцу сессии)
+        // Поиск работает только по своей коллекции (/me), в чужом профиле его скрываем
         if (gridSearchInput) gridSearchInput.style.display = 'none';
     } else {
         // РЕЖИМ ХОЗЯИНА
@@ -49,12 +55,8 @@ document.addEventListener('DOMContentLoaded', () => {
             currentGridQuery = e.target.value.trim();
             clearTimeout(gridSearchTimeout);
 
-            // Ждем 500мс после ввода, чтобы не ДДОСить бэкенд
-            gridSearchTimeout = setTimeout(() => {
-                gridPage = 0;
-                document.getElementById('full-grid-content').innerHTML = '';
-                loadGridPage();
-            }, 500);
+            // Небольшая задержка, чтобы не перерисовывать грид на каждую букву
+            gridSearchTimeout = setTimeout(applyGridSearch, 250);
         });
     }
 
@@ -70,7 +72,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Перезагружаем данные при смене языка
-    window.onLanguageChanged = loadDashboard;
+    window.onLanguageChanged = () => {
+        invalidateGridCache();
+        loadDashboard();
+        if (isGridOpen()) applyGridSearch();
+    };
 
     // Сразу грузим дашборд
     loadDashboard();
@@ -277,11 +283,8 @@ async function deleteItem(id, isMovie) {
             closeModal(isMovie ? 'movie-modal' : 'progress-modal');
             loadDashboard();
 
-            if (document.getElementById('full-grid-modal').classList.contains('show')) {
-                gridPage = 0;
-                document.getElementById('full-grid-content').innerHTML = '';
-                loadGridPage();
-            }
+            invalidateGridCache();
+            if (isGridOpen()) applyGridSearch();
         } else {
             showToast(t('toast-error'), true);
         }
@@ -295,15 +298,15 @@ async function deleteItem(id, isMovie) {
 // =======================
 function openFullGrid(type) {
     gridType = type;
-    gridPage = 0;
     currentGridQuery = '';
+    clearTimeout(gridSearchTimeout);
+    invalidateGridCache();
+    resetGrid();
 
     const searchInput = document.getElementById('grid-search-input');
     if (searchInput) searchInput.value = '';
 
-    const content = document.getElementById('full-grid-content');
     const title = document.getElementById('full-grid-title');
-    if (content) content.innerHTML = '';
     if (title) title.innerText = t('all-saved-title');
 
     document.getElementById('full-grid-modal').classList.add('show');
@@ -311,26 +314,61 @@ function openFullGrid(type) {
     loadGridPage();
 }
 
+function isGridOpen() {
+    return document.getElementById('full-grid-modal').classList.contains('show');
+}
+
+// Новое «поколение» грида: все запросы, начатые раньше, после этого игнорируются
+function resetGrid() {
+    gridGeneration++;
+    gridPage = 0;
+    isGridLoading = false;
+    const content = document.getElementById('full-grid-content');
+    if (content) content.innerHTML = '';
+    return gridGeneration;
+}
+
+function invalidateGridCache() {
+    gridAllItemsPromise = null;
+}
+
+function renderGridItems(items) {
+    const isMovie = gridType === 'movies';
+    const container = document.getElementById('full-grid-content');
+    if (!container) return;
+
+    if (items.length === 0 && container.children.length === 0) {
+        container.innerHTML = `<h3 style="color: white; text-align: center; width: 100%; grid-column: 1 / -1;">${t('no-results')}</h3>`;
+        return;
+    }
+
+    const detailBtnText = t('more-details');
+    items.forEach(item => {
+        const id = isMovie ? item.movieId : item.tvShowId;
+        const title = isMovie ? item.title : item.name;
+
+        // Сохраняем в кэш, чтобы openItemModal нашел карточку
+        if (isMovie) loadedMovies[id] = item; else loadedTvShows[id] = item;
+
+        container.insertAdjacentHTML('beforeend', buildCardHtml(item, id, title, isMovie, detailBtnText));
+    });
+
+    bindImageFallbacks(container);
+}
+
+// Постраничный просмотр (без поискового запроса)
 async function loadGridPage() {
     if (isGridLoading) return;
     isGridLoading = true;
+    const generation = gridGeneration;
     const status = document.getElementById('grid-load-status');
     if (status) status.innerText = t('loading');
 
     const isMovie = gridType === 'movies';
     const basePath = isMovie ? `/watchlist-movies` : `/watchlist-tv-shows`;
-    let endpoint = '';
-
-    // ЛОГИКА ФОРМИРОВАНИЯ URL
-    if (currentGridQuery.length > 0) {
-        // РАБОТАЕТ ПОИСК (без userId, бэкенд берет пользователя из сессии)
-        endpoint = `${basePath}/search/${encodeURIComponent(currentGridQuery)}?page=${gridPage}&size=20&language=${currentLang}`;
-    } else {
-        // ПРОСТО ЛИСТАЕМ КАРТОТЕКУ
-        endpoint = isMyProfile
-            ? `${basePath}/me?page=${gridPage}&size=20&language=${currentLang}`
-            : `${basePath}/${currentProfileUserId}/user?page=${gridPage}&size=20&language=${currentLang}`;
-    }
+    const endpoint = isMyProfile
+        ? `${basePath}/me?page=${gridPage}&size=20&language=${currentLang}`
+        : `${basePath}/${currentProfileUserId}/user?page=${gridPage}&size=20&language=${currentLang}`;
 
     try {
         const response = await watchlistFetch(endpoint);
@@ -338,38 +376,86 @@ async function loadGridPage() {
         if (!response.ok) throw new Error('Server error');
 
         const data = await response.json();
-        const items = data.content || [];
+        // Пока шел запрос, грид сбросили (новый поиск, смена языка): ответ уже не нужен
+        if (generation !== gridGeneration) return;
+
         gridTotalPages = data.page?.totalPages || data.totalPages || 1;
-
-        const container = document.getElementById('full-grid-content');
-        const detailBtnText = t('more-details');
-
-        if (items.length === 0 && gridPage === 0) {
-            container.innerHTML = `<h3 style="color: white; text-align: center; width: 100%; grid-column: 1 / -1;">${t('no-results')}</h3>`;
-        }
-
-        items.forEach(item => {
-            const id = isMovie ? item.movieId : item.tvShowId;
-            const title = isMovie ? item.title : item.name;
-
-            // Сохраняем в кэш
-            if (isMovie) loadedMovies[id] = item; else loadedTvShows[id] = item;
-
-            container.insertAdjacentHTML('beforeend', buildCardHtml(item, id, title, isMovie, detailBtnText));
-        });
-
-        bindImageFallbacks(container);
+        renderGridItems(data.content || []);
 
         if (status) status.innerText = '';
     } catch (e) {
-        if (status) status.innerText = t('toast-error');
+        if (generation === gridGeneration && status) status.innerText = t('toast-error');
     } finally {
-        isGridLoading = false;
+        if (generation === gridGeneration) isGridLoading = false;
+    }
+}
+
+// Вся коллекция выбранного типа (для поиска). Кэшируется, пока не сменился тип/язык
+function loadAllGridItems() {
+    const key = `${gridType}:${currentLang}`;
+    if (gridAllItemsPromise && gridAllItemsKey === key) return gridAllItemsPromise;
+
+    gridAllItemsKey = key;
+    const promise = fetchAllGridItems(gridType === 'movies').catch(error => {
+        // Ошибку не кэшируем, следующий ввод попробует еще раз
+        if (gridAllItemsPromise === promise) gridAllItemsPromise = null;
+        throw error;
+    });
+    gridAllItemsPromise = promise;
+    return promise;
+}
+
+async function fetchAllGridItems(isMovie) {
+    const basePath = isMovie ? '/watchlist-movies' : '/watchlist-tv-shows';
+    const items = [];
+    let page = 0;
+    let totalPages = 1;
+
+    while (page < totalPages) {
+        const response = await watchlistFetch(`${basePath}/me?page=${page}&size=50&language=${currentLang}`);
+        if (response.status === 401) {
+            redirectToLogin();
+            throw new Error('Unauthorized');
+        }
+        if (!response.ok) throw new Error('Server error');
+
+        const data = await response.json();
+        items.push(...(data.content || []));
+        totalPages = data.page?.totalPages || data.totalPages || 1;
+        page++;
+    }
+    return items;
+}
+
+// Перерисовывает грид под текущий запрос: пустой — обычный постраничный список, иначе фильтр по названию
+async function applyGridSearch() {
+    const generation = resetGrid();
+
+    if (currentGridQuery.length === 0) {
+        loadGridPage();
+        return;
+    }
+
+    const status = document.getElementById('grid-load-status');
+    if (status) status.innerText = t('loading');
+
+    try {
+        const all = await loadAllGridItems();
+        if (generation !== gridGeneration) return;
+
+        const query = currentGridQuery.toLowerCase();
+        const isMovie = gridType === 'movies';
+        renderGridItems(all.filter(item =>
+            String((isMovie ? item.title : item.name) ?? '').toLowerCase().includes(query)
+        ));
+        if (status) status.innerText = '';
+    } catch (e) {
+        if (generation === gridGeneration && status) status.innerText = t('toast-error');
     }
 }
 
 document.getElementById('grid-scroll-container')?.addEventListener('scroll', function () {
-    if (isGridLoading || gridPage >= gridTotalPages - 1) return;
+    if (currentGridQuery.length > 0 || isGridLoading || gridPage >= gridTotalPages - 1) return;
     if (this.scrollHeight - this.scrollTop <= this.clientHeight + 200) {
         gridPage++;
         loadGridPage();
