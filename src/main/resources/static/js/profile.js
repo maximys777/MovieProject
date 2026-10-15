@@ -101,11 +101,11 @@ function buildCardHtml(item, id, title, isMovie, detailBtnText) {
     return `
         <div class="movie-card" data-profile-id="${id}" data-profile-movie="${isMovie}">
             <div style="position:relative">
-                <img src="${IMG_500}${item.posterUrl || item.posterPath || ''}" alt="${title}" data-fallback="${POSTER_FALLBACK}">
+                <img src="${IMG_500}${item.posterUrl || item.posterPath || ''}" alt="${escapeHtml(title)}" data-fallback="${POSTER_FALLBACK}">
                 ${badge}
             </div>
             <div class="movie-card-body">
-                <div class="movie-title" title="${title}">${title}</div>
+                <div class="movie-title" title="${escapeHtml(title)}">${escapeHtml(title)}</div>
                 <button class="btn-detail-card">${detailBtnText}</button>
             </div>
         </div>

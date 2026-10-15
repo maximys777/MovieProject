@@ -19,6 +19,20 @@ let currentSelectedMovie = null;
 let trendingItems = [];
 let catalogItems = [];
 
+// Защита от устаревших ответов: если пока шёл запрос, пользователь переключил
+// тип, период или язык, ответ старого запроса не должен перезаписывать свежий
+let trendingRequestId = 0;   // номер последнего запроса трендов
+let catalogGeneration = 0;   // «поколение» каталога, растёт при каждом сбросе
+
+// --- ЭКРАНИРОВАНИЕ ---
+// Названия, жанры и прочие строки из TMDB попадают в innerHTML и в атрибуты (alt, title),
+// поэтому кавычка или '<' в названии не должны ломать разметку
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
+}
+
 // --- УВЕДОМЛЕНИЯ ---
 function showToast(message, isError = false) {
     const toast = document.getElementById('custom-toast');
@@ -140,6 +154,10 @@ function updateTimeWindow(timeWindow, btnId) {
 function resetCatalog() {
     const grid = document.getElementById('movies-grid');
     if (!grid) return;
+    // Новое поколение: ответ запроса, летевшего до сброса, будет отброшен.
+    // isLoading снимаем, иначе loadCatalog() ниже молча ничего не сделает
+    catalogGeneration++;
+    isLoading = false;
     currentPage = 1;
     catalogItems = [];
     grid.innerHTML = '';
@@ -169,14 +187,20 @@ function getDisplayTitle(item) {
 async function loadTrending() {
     const slider = document.getElementById('trending-slider');
     if (!slider) return;
+    const requestId = ++trendingRequestId;
     slider.innerHTML = `<p style="padding: 20px;">${t('loading')}</p>`;
     try {
         const url = `${API_BASE_URL}/trending/${currentMediaType}/${currentTimeWindow}?page=1&language=${currentLang}`;
         const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+        if (requestId !== trendingRequestId) return;
         const responseData = Array.isArray(data) ? data[0] : data;
 
-        if (!responseData || !responseData.results) return;
+        if (!responseData || !responseData.results) {
+            slider.innerHTML = `<p style="padding: 20px;">${t('toast-error')}</p>`;
+            return;
+        }
 
         trendingItems = responseData.results.filter(m => m.poster_path).slice(0, 10);
 
@@ -184,9 +208,9 @@ async function loadTrending() {
             <div class="slider-item" data-trending-index="${index}">
                 <div class="image-container">
                     <span class="rating-badge">★ ${item.vote_average ? item.vote_average.toFixed(1) : '0.0'}</span>
-                    <img src="${IMG_500}${item.poster_path}" alt="${getDisplayTitle(item)}" data-fallback="hide">
+                    <img src="${IMG_500}${item.poster_path}" alt="${escapeHtml(getDisplayTitle(item))}" data-fallback="hide">
                 </div>
-                <div class="movie-title">${getDisplayTitle(item)}</div>
+                <div class="movie-title">${escapeHtml(getDisplayTitle(item))}</div>
             </div>
         `).join('');
 
@@ -195,6 +219,9 @@ async function loadTrending() {
         slider.scrollLeft = 0;
     } catch (e) {
         console.error(e);
+        if (requestId === trendingRequestId) {
+            slider.innerHTML = `<p style="padding: 20px;">${t('toast-error')}</p>`;
+        }
     }
 }
 
@@ -205,12 +232,15 @@ async function loadCatalog() {
 
     if (isLoading) return;
     isLoading = true;
+    const generation = catalogGeneration;
     statusEl.innerText = t('loading');
 
     try {
         const url = `${API_BASE_URL}/trending/${currentMediaType}/${currentTimeWindow}?page=${currentPage}&language=${currentLang}`;
         const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+        if (generation !== catalogGeneration) return;
         const responseData = Array.isArray(data) ? data[0] : data;
 
         if (!responseData || !responseData.results) {
@@ -224,9 +254,10 @@ async function loadCatalog() {
         statusEl.innerText = currentPage >= totalPages ? t('no-more-results') : '';
     } catch (e) {
         console.error(e);
-        statusEl.innerText = t('toast-error');
+        if (generation === catalogGeneration) statusEl.innerText = t('toast-error');
     } finally {
-        isLoading = false;
+        // Устаревший запрос не трогает флаг: он уже принадлежит новому поколению
+        if (generation === catalogGeneration) isLoading = false;
     }
 }
 
@@ -240,11 +271,11 @@ function appendItems(items) {
         return `
         <div class="movie-card" data-item-index="${index}">
             <div style="position:relative">
-                <img src="${IMG_500}${item.poster_path || item.posterPath}" alt="${getDisplayTitle(item)}" data-fallback="${POSTER_FALLBACK}">
+                <img src="${IMG_500}${item.poster_path || item.posterPath}" alt="${escapeHtml(getDisplayTitle(item))}" data-fallback="${POSTER_FALLBACK}">
                 <span class="rating-badge">★ ${item.vote_average ? item.vote_average.toFixed(1) : '0.0'}</span>
             </div>
             <div class="movie-card-body">
-                <div class="movie-title" title="${getDisplayTitle(item)}">${getDisplayTitle(item)}</div>
+                <div class="movie-title" title="${escapeHtml(getDisplayTitle(item))}">${escapeHtml(getDisplayTitle(item))}</div>
                 <button class="btn-detail-card" style="width:100%; padding:8px; background:var(--primary-color); border:none; color:white; border-radius:4px; cursor:pointer;">
                     ${detailsLabel}
                 </button>
@@ -349,12 +380,11 @@ async function saveMovieToWatchlist() {
         formattedDate = releaseDate.substring(0, 10) + 'T00:00:00';
     }
 
-    // Шлем ID в двух форматах, чтобы Spring Boot 100% его съел
+    // AddToWatchlistMovieRequest помечен @JsonNaming(SnakeCase), поэтому поля snake_case
     const payload = {
         poster_path: item.poster_path || item.posterPath,
         title: getDisplayTitle(item),
-        movieId: item.id,      // Для camelCase
-        movie_id: item.id,     // Для snake_case
+        movie_id: item.id,
         release_date: formattedDate,
         popularity: item.popularity || 0.0
     };
@@ -547,7 +577,7 @@ async function saveTvShowProgress() {
     }
 
     // Достаем страну (из новых данных TMDB)
-    let originCountry = 'US';
+    let originCountry = null;   // не выдумываем страну, если TMDB её не отдал
     if (currentShowData.production_countries && currentShowData.production_countries.length > 0) {
         originCountry = currentShowData.production_countries[0].name || currentShowData.production_countries[0].iso_3166_1;
     } else if (currentShowData.origin_country && currentShowData.origin_country.length > 0) {
@@ -555,9 +585,8 @@ async function saveTvShowProgress() {
     }
 
     const payload = {
-        // Шлем ID в двух форматах (как делали с фильмами), чтобы Spring 100% его съел
+        // AddToWatchlistTvShowRequest без @JsonNaming, поля camelCase
         tvShowId: currentShowData.id,
-        tv_show_id: currentShowData.id,
         name: currentShowData.name || currentShowData.title,
         posterUrl: currentShowData.poster_path || currentShowData.posterPath,
         firstAirDate: currentShowData.first_air_date || currentShowData.firstAirDate,
@@ -656,6 +685,14 @@ window.addEventListener('click', e => {
     if (e.target.classList.contains('modal-overlay')) closeModal(e.target.id);
 });
 
+// Esc закрывает модалки и выпадающий список поиска
+document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    closeModal();
+    const dropdown = document.getElementById('search-dropdown');
+    if (dropdown) dropdown.classList.add('hidden');
+});
+
 window.addEventListener('scroll', () => {
     // Защита: бесконечный скролл только на главной
     if (!document.getElementById('load-status')) return;
@@ -721,7 +758,7 @@ function formatList(list) {
 
 function formatGenres(genres) {
     if (!genres || !Array.isArray(genres) || genres.length === 0) return '';
-    return genres.map(g => `<span class="genre-tag">${g.name || g}</span>`).join('');
+    return genres.map(g => `<span class="genre-tag">${escapeHtml(g.name || g)}</span>`).join('');
 }
 
 function toggleOverview(textId, btn) {
@@ -757,10 +794,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnAll = document.getElementById('btn-view-all-search');
 
     let timeout = null;
+    let searchRequestId = 0;   // любой новый ввод делает прошлые ответы устаревшими
     if (input) {
         input.addEventListener('input', e => {
             const q = e.target.value.trim();
             clearTimeout(timeout);
+            searchRequestId++;
             if (q.length < 2) {
                 dropdown.classList.add('hidden');
                 spinner.classList.add('hidden');
@@ -768,14 +807,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             spinner.classList.remove('hidden');
             timeout = setTimeout(async () => {
+                const requestId = searchRequestId;
                 try {
                     const res = await fetch(`/search/live?query=${encodeURIComponent(q)}&language=${currentLang}`);
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
                     const data = await res.json();
+                    if (requestId !== searchRequestId) return;
                     renderDropdown(data, q);
                 } catch (e) {
                     console.error(e);
                 } finally {
-                    spinner.classList.add('hidden');
+                    if (requestId === searchRequestId) spinner.classList.add('hidden');
                 }
             }, 500);
         });
@@ -809,11 +851,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     type === 'movie' ? openMovieModal(comp) : openTvModal(comp);
                 });
                 div.innerHTML = `
-                    <img src="${img}" alt="${title}" class="search-item-img" data-fallback="${POSTER_FALLBACK_SMALL}">
+                    <img src="${img}" alt="${escapeHtml(title)}" class="search-item-img" data-fallback="${POSTER_FALLBACK_SMALL}">
                     <div class="search-item-info">
-                        <div class="search-item-title">${title}</div>
+                        <div class="search-item-title">${escapeHtml(title)}</div>
                         <div class="search-item-meta">${type === 'movie' ? t('film') : t('tv-show')} • ${year || 'N/A'}</div>
-                        <div class="search-item-genres">${(item.genres || []).join(', ')}</div>
+                        <div class="search-item-genres">${escapeHtml((item.genres || []).join(', '))}</div>
                     </div>`;
                 bindImageFallbacks(div);
                 results.appendChild(div);
