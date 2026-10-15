@@ -63,7 +63,7 @@ async function loadFullSearchResults(query) {
             const typeText = type === 'movie' ? t('film') : t('tv-show');
             const genresList = item.genreNames || item.genre_names || [];
             const genresHtml = genresList.length > 0
-                ? `<div style="font-size: 11px; color: #888; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${genresList.join(', ')}</div>`
+                ? `<div style="font-size: 11px; color: #888; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(genresList.join(', '))}</div>`
                 : '';
 
             const posterUrl = poster ? `${IMG_500}${poster}` : POSTER_FALLBACK;
@@ -90,11 +90,11 @@ async function loadFullSearchResults(query) {
             card.dataset.searchIndex = index;
             card.innerHTML = `
                 <div style="position:relative">
-                    <img src="${posterUrl}" alt="${title}" data-fallback="${POSTER_FALLBACK}">
+                    <img src="${posterUrl}" alt="${escapeHtml(title)}" data-fallback="${POSTER_FALLBACK}">
                     <span class="rating-badge">★ ${rating}</span>
                 </div>
                 <div class="movie-card-body">
-                    <div class="movie-title" title="${title}">${title}</div>
+                    <div class="movie-title" title="${escapeHtml(title)}">${escapeHtml(title)}</div>
                     <div style="font-size: 12px; color: #8b8b99; margin-bottom: 4px; font-weight: bold;">
                         ${typeText}
                     </div>
