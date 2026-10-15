@@ -296,6 +296,7 @@ h2 {
 }
 
 .loading-status {
+    box-sizing: border-box; /* width:100% + padding иначе шире родителя и даёт горизонтальный скролл */
     text-align: center;
     padding: 20px;
     font-size: 14px;
