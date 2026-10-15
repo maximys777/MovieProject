@@ -11,7 +11,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,6 +25,7 @@ import reactor.core.publisher.Flux;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/trending")
+@Validated
 public class TMDBController {
     private final TMDBService tmdbService;
 
@@ -38,7 +41,7 @@ public class TMDBController {
     })
     @GetMapping("/movies/{timeWindow}")
     public Flux<TrendMovieResponse> getTrendingMovies(@PathVariable TimeWindow timeWindow,
-                                                      @RequestParam(defaultValue = "1") int page,
+                                                      @RequestParam(defaultValue = "1") @Min(1) int page,
                                                       @RequestParam LanguageType language) {
         return tmdbService.getTrendingMovies(timeWindow, page, language);
     }
@@ -55,7 +58,7 @@ public class TMDBController {
     })
     @GetMapping("/tv-shows/{timeWindow}")
     public Flux<TrendTvShowResponse> getTrendingTvShows(@PathVariable TimeWindow timeWindow,
-                                                        @RequestParam(defaultValue = "1") int page,
+                                                        @RequestParam(defaultValue = "1") @Min(1) int page,
                                                         @RequestParam LanguageType language) {
         return tmdbService.getTrendingTvShows(timeWindow, page, language);
     }
