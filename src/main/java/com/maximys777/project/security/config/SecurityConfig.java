@@ -60,6 +60,7 @@ public class SecurityConfig {
     private static final RequestMatcher API_REQUESTS = new OrRequestMatcher(
             PathPatternRequestMatcher.pathPattern("/watchlist-movies/**"),
             PathPatternRequestMatcher.pathPattern("/watchlist-tv-shows/**"),
+            PathPatternRequestMatcher.pathPattern("/users/me"),
             new RequestHeaderRequestMatcher("X-Requested-With", "XMLHttpRequest"));
 
     @Bean

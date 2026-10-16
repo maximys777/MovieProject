@@ -61,6 +61,28 @@ body {
     color: var(--text-color);
 }
 
+.auth-slot {
+    display: flex;
+    align-items: center;
+    min-height: 38px;
+}
+
+.btn-login {
+    padding: 8px 18px;
+    background: var(--primary-color);
+    color: #fff;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: 0.3s;
+}
+
+.btn-login:hover {
+    filter: brightness(1.15);
+}
+
 .profile-link {
     display: flex;
     align-items: center;

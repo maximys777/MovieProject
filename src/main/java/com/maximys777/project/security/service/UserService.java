@@ -1,10 +1,12 @@
 package com.maximys777.project.security.service;
 
+import com.maximys777.project.exceptions.exceptions.UsernameNotFoundException;
 import com.maximys777.project.security.dto.request.UserLoginRequest;
-import com.maximys777.project.security.dto.response.UserCreatedResponse;
+import com.maximys777.project.security.dto.response.CurrentUserResponse;
 import com.maximys777.project.security.entity.UserEntity;
 import com.maximys777.project.security.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -17,8 +19,6 @@ public class UserService {
     public void processOAuthPostLogin(UserLoginRequest userLoginRequest) {
         Optional<UserEntity> user = userRepository.findByEmail(userLoginRequest.email());
 
-        UserEntity savedUser;
-
         if (user.isEmpty()) {
             UserEntity newUser = UserEntity.builder()
                     .email(userLoginRequest.email())
@@ -27,17 +27,24 @@ public class UserService {
                     .profilePictureUrl(userLoginRequest.profilePictureUrl())
                     .build();
 
-            savedUser = userRepository.save(newUser);
+            userRepository.save(newUser);
         } else {
-            savedUser = user.get();
+            user.get();
         }
+    }
 
-        UserCreatedResponse.builder()
-                .id(savedUser.getId())
-                .email(savedUser.getEmail())
-                .userName(savedUser.getUserName())
-                .googleId(savedUser.getGoogleId())
-                .profilePictureUrl(savedUser.getProfilePictureUrl())
+    public CurrentUserResponse getCurrentUser(OidcUser oidcUser) {
+        UserEntity user = handleUserNotFound(oidcUser.getEmail());
+
+        return CurrentUserResponse.builder()
+                .id(user.getId())
+                .userName(user.getUserName())
+                .profilePictureUrl(user.getProfilePictureUrl())
                 .build();
+    }
+
+    private UserEntity handleUserNotFound(String userEmail) {
+        return userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     }
 }
