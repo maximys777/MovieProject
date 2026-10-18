@@ -8,6 +8,7 @@ import com.maximys777.project.security.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -16,6 +17,7 @@ import java.util.Optional;
 public class UserService {
     private final UserRepository userRepository;
 
+    @Transactional
     public void processOAuthPostLogin(UserLoginRequest userLoginRequest) {
         Optional<UserEntity> user = userRepository.findByEmail(userLoginRequest.email());
 
@@ -29,7 +31,10 @@ public class UserService {
 
             userRepository.save(newUser);
         } else {
-            user.get();
+            UserEntity existingUser = user.get();
+
+            existingUser.setUserName(userLoginRequest.userName());
+            existingUser.setProfilePictureUrl(userLoginRequest.profilePictureUrl());
         }
     }
 
